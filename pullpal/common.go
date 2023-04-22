@@ -42,6 +42,22 @@ func NewPullPal(ctx context.Context, log *zap.Logger, self vc.Author, repo vc.Re
 // IssueNotFound is returned when no issue can be found to generate a prompt for.
 var IssueNotFound = errors.New("no issue found")
 
+// PickIssueToFile is the same as PickIssue, but the changeRequest is converted to a string and written to a file.
+func (p *PullPal) PickIssueToFile(promptPath string) (issue vc.Issue, changeRequest llm.CodeChangeRequest, err error) {
+	issue, changeRequest, err = p.PickIssue()
+	if err != nil {
+		return issue, changeRequest, err
+	}
+
+	prompt, err := changeRequest.GetPrompt()
+	if err != nil {
+		return issue, changeRequest, err
+	}
+
+	err = ioutil.WriteFile(promptPath, []byte(prompt), 0644)
+	return issue, changeRequest, err
+}
+
 // PickIssue selects an issue from the version control server and returns the selected issue, as well as the LLM prompt needed to fulfill the request.
 func (p *PullPal) PickIssue() (issue vc.Issue, changeRequest llm.CodeChangeRequest, err error) {
 	// TODO I should be able to pass in settings for listing issues from here
