@@ -83,7 +83,6 @@ func NewGithubClient(ctx context.Context, log *zap.Logger, self Author, repo Rep
 // OpenCodeChangeRequest pushes to a new remote branch and opens a PR on Github.
 func (gc *GithubClient) OpenCodeChangeRequest(req llm.CodeChangeRequest, res llm.CodeChangeResponse) (id, url string, err error) {
 	// TODO handle gc.ctx canceled
-	gc.log.Debug("Creating a new pull request...")
 
 	title := req.Subject
 	branchName := randomBranchName()
@@ -94,7 +93,6 @@ func (gc *GithubClient) OpenCodeChangeRequest(req llm.CodeChangeRequest, res llm
 	body += fmt.Sprintf("\n\nResolves #%s", req.IssueID)
 	issue, err := strconv.Atoi(req.IssueID)
 	if err != nil {
-		gc.log.Error("Failed to parse issue ID from code change request as integer", zap.String("provided issue ID", req.IssueID), zap.Error(err))
 		return "", "", err
 	}
 
@@ -144,13 +142,11 @@ func (gc *GithubClient) OpenCodeChangeRequest(req llm.CodeChangeRequest, res llm
 		Issue: &issue,
 	})
 	if err != nil {
-		gc.log.Error("Failed to create pull request", zap.Error(err))
 		return "", "", err
 	}
 
 	url = pr.GetHTMLURL()
 	id = strconv.Itoa(int(pr.GetID()))
-	gc.log.Info("Successfully created pull request.", zap.String("ID", id), zap.String("URL", url))
 
 	return id, url, nil
 }
@@ -166,12 +162,16 @@ func (gc *GithubClient) ListOpenIssues() ([]Issue, error) {
 	// List and parse GitHub issues
 	issues, _, err := gc.client.Issues.ListByRepo(gc.ctx, gc.repo.Owner.Handle, gc.repo.Name, nil)
 	if err != nil {
-		gc.log.Error("Failed to list issues", zap.Error(err))
 		return nil, err
 	}
 
-	toReturn := make([]Issue, len(issues))
+	toReturn := []Issue{}
 	for _, issue := range issues {
+		// TODO make this filtering configurable from outside
+		if issue.GetUser().GetLogin() != gc.repo.Owner.Handle {
+			continue
+		}
+
 		nextIssue := Issue{
 			ID:      strconv.Itoa(int(issue.GetID())),
 			Subject: issue.GetTitle(),
