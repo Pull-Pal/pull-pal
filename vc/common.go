@@ -52,4 +52,14 @@ type VCClient interface {
 	// UpdateCodeChangeRequest updates an existing code change request on the version control server.
 	// UpdateCodeChangeRequest(id string, res llm.CodeChangeResponse)
 	// TODO: add/read comments to/from issues and code change requests
+	// GetLocalFile gets the current representation of the file at the provided path from the local git repo.
+	GetLocalFile(path string) (llm.File, error)
+	// StartCommit initiates a commit process, after which files can be modified and added to the commit.
+	StartCommit() error
+	// ReplaceOrAddLocalFile updates or adds a file in the locally cloned repo, and applies these changes to the current git worktree.
+	ReplaceOrAddLocalFile(newFile llm.File) error
+	// FinishCommit completes a commit, after which a code change request can be opened or updated.
+	FinishCommit(message string) error
+	// Close tears down the VCClient.
+	Close() error
 }
