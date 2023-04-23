@@ -37,7 +37,7 @@ func (req CodeChangeRequest) MustGetPrompt() string {
 
 // GetPrompt converts the information in the request to a prompt for an LLM.
 func (req CodeChangeRequest) GetPrompt() (string, error) {
-	tmpl, err := template.ParseFiles("./code-change-request.tmpl")
+	tmpl, err := template.ParseFiles("./llm/code-change-request.tmpl")
 	if err != nil {
 		return "", err
 	}

@@ -28,7 +28,7 @@ type PullPal struct {
 func NewPullPal(ctx context.Context, log *zap.Logger, self vc.Author, repo vc.Repository) (*PullPal, error) {
 	ghClient, err := vc.NewGithubClient(ctx, log, self, repo)
 	if err != nil {
-		log.Error("Failed to setup Github client.", zap.Error(err))
+		return nil, err
 	}
 
 	return &PullPal{

@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mobyvb/pull-pal/llm"
 
@@ -39,7 +40,7 @@ type GithubClient struct {
 
 // NewGithubClient initializes a Github client and checks out a repository locally.
 func NewGithubClient(ctx context.Context, log *zap.Logger, self Author, repo Repository) (*GithubClient, error) {
-	log.Debug("Creating new Github client...")
+	log.Info("Creating new Github client...")
 	if self.Token == "" {
 		return nil, errors.New("Github access token not provided")
 	}
@@ -53,7 +54,16 @@ func NewGithubClient(ctx context.Context, log *zap.Logger, self Author, repo Rep
 	if repo.LocalPath == "" {
 		return nil, errors.New("local path to clone repository not provided")
 	}
-	log.Debug("Cloning repository locally...")
+
+	if repo.LocalPath != "" {
+		// remove local repo if it exists already
+		err := os.RemoveAll(repo.LocalPath)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	log.Info("Cloning repository locally...", zap.String("local repo path", repo.LocalPath), zap.String("url", repo.SSH()))
 	// TODO this can be done in-memory - see https://pkg.go.dev/github.com/go-git/go-git/v5#readme-in-memory-example
 	localRepo, err := git.PlainClone(repo.LocalPath, false, &git.CloneOptions{
 		URL: repo.SSH(),
@@ -64,12 +74,12 @@ func NewGithubClient(ctx context.Context, log *zap.Logger, self Author, repo Rep
 		},
 	})
 	if err != nil {
-		log.Error("Failed to clone local repo.", zap.Error(err))
+		log.Info("failed")
 		return nil, err
 	}
 	repo.localRepo = localRepo
 
-	log.Debug("Success. Github client set up.")
+	log.Info("Success. Github client set up.")
 
 	return &GithubClient{
 		ctx:    ctx,
@@ -91,10 +101,6 @@ func (gc *GithubClient) OpenCodeChangeRequest(req llm.CodeChangeRequest, res llm
 	remoteName := "origin"
 	body := res.Notes
 	body += fmt.Sprintf("\n\nResolves #%s", req.IssueID)
-	issue, err := strconv.Atoi(req.IssueID)
-	if err != nil {
-		return "", "", err
-	}
 
 	// Create new local branch
 	headRef, err := gc.repo.localRepo.Head()
@@ -139,7 +145,6 @@ func (gc *GithubClient) OpenCodeChangeRequest(req llm.CodeChangeRequest, res llm
 		Head:  &branchName,
 		Base:  &baseBranch,
 		Body:  &body,
-		Issue: &issue,
 	})
 	if err != nil {
 		return "", "", err
@@ -173,7 +178,7 @@ func (gc *GithubClient) ListOpenIssues() ([]Issue, error) {
 		}
 
 		nextIssue := Issue{
-			ID:      strconv.Itoa(int(issue.GetID())),
+			ID:      strconv.Itoa(issue.GetNumber()),
 			Subject: issue.GetTitle(),
 			Body:    issue.GetBody(),
 			URL:     issue.GetHTMLURL(),
@@ -194,6 +199,14 @@ func (gc *GithubClient) GetLocalFile(path string) (llm.File, error) {
 
 	data, err := ioutil.ReadFile(fullPath)
 	if err != nil {
+		// if file doesn't exist, just return an empty file
+		// this means we want to prompt the llm to populate it for the first time
+		if errors.Is(err, os.ErrNotExist) {
+			return llm.File{
+				Path:     path,
+				Contents: "",
+			}, nil
+		}
 		return llm.File{}, err
 	}
 
@@ -255,19 +268,9 @@ func (gc *GithubClient) FinishCommit(message string) error {
 		Author: &object.Signature{
 			Name:  gc.self.Handle,
 			Email: gc.self.Email,
+			When:  time.Now(),
 		},
 	})
 
 	return err
-}
-
-func (gc *GithubClient) Close() error {
-	// Remove local repository
-	if gc.repo.LocalPath != "" {
-		err := os.RemoveAll(gc.repo.LocalPath)
-
-		return err
-	}
-
-	return nil
 }

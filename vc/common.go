@@ -35,7 +35,7 @@ type Repository struct {
 
 // SSH returns the SSH connection string for the repository.
 func (repo Repository) SSH() string {
-	return fmt.Sprintf("git%s:%s/%s.git", repo.HostDomain, repo.Owner.Handle, repo.Name)
+	return fmt.Sprintf("git@%s:%s/%s.git", repo.HostDomain, repo.Owner.Handle, repo.Name)
 }
 
 // HTTPS returns the HTTPS representation of the remote repository.
@@ -60,6 +60,4 @@ type VCClient interface {
 	ReplaceOrAddLocalFile(newFile llm.File) error
 	// FinishCommit completes a commit, after which a code change request can be opened or updated.
 	FinishCommit(message string) error
-	// Close tears down the VCClient.
-	Close() error
 }

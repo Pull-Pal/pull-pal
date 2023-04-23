@@ -17,9 +17,7 @@ Files:
 {{ range $index, $file := .Files }}
   - name: {{ $file.Path }}
     contents:
-    ```
     [new {{ $file.Path }} contents]
-    ```
 {{ end }}
 
 Notes:

@@ -1,7 +1,8 @@
 SHELL := /bin/bash
 
 build:
-	go build -v -o pal ./cmd
+	go build -v -o pal ./
+	chmod +rwx ./pal
 
 run:
-	go run ./cmd/
+	go run ./
