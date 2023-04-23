@@ -95,6 +95,9 @@ func (gc *GithubClient) OpenCodeChangeRequest(req llm.CodeChangeRequest, res llm
 	// TODO handle gc.ctx canceled
 
 	title := req.Subject
+	if title == "" {
+		title = "update files"
+	}
 	branchName := randomBranchName()
 	branchRefName := plumbing.NewBranchReferenceName(branchName)
 	baseBranch := "main"
@@ -271,6 +274,12 @@ func (gc *GithubClient) FinishCommit(message string) error {
 			When:  time.Now(),
 		},
 	})
+	if err != nil {
+		return err
+	}
 
-	return err
+	// set worktree to nil so a new commit can be started
+	gc.worktree = nil
+
+	return nil
 }
