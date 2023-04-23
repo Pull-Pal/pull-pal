@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/mobyvb/pull-pal/llm"
 	"github.com/mobyvb/pull-pal/pullpal"
 	"github.com/mobyvb/pull-pal/vc"
 	"github.com/spf13/cobra"
@@ -32,6 +33,7 @@ It can be used to:
 		githubToken := viper.GetString("github-token")
 		localRepoPath := viper.GetString("local-repo-path")
 		promptPath := viper.GetString("prompt-path")
+		promptToClipboard := viper.GetBool("prompt-to-clipboard")
 		responsePath := viper.GetString("response-path")
 
 		log, err := zap.NewProduction()
@@ -59,13 +61,24 @@ It can be used to:
 		}
 		log.Info("Successfully initialized pull pal")
 
-		issue, changeRequest, err := p.PickIssueToFile(promptPath)
-		if err != nil {
-			log.Error("error selecting issue and/or generating prompt", zap.Error(err))
-			return
-		}
+		var issue vc.Issue
+		var changeRequest llm.CodeChangeRequest
+		if promptToClipboard {
+			issue, changeRequest, err = p.PickIssueToClipboard(promptPath)
+			if err != nil {
+				log.Error("error selecting issue and/or generating prompt", zap.Error(err))
+				return
+			}
 
-		log.Info("Picked issue and created prompt", zap.String("issue ID", issue.ID), zap.String("prompt location", promptPath))
+			log.Info("Picked issue and copied prompt to clipboard", zap.String("issue ID", issue.ID))
+		} else {
+			issue, changeRequest, err = p.PickIssueToFile(promptPath)
+			if err != nil {
+				log.Error("error selecting issue and/or generating prompt", zap.Error(err))
+				return
+			}
+			log.Info("Picked issue and created prompt", zap.String("issue ID", issue.ID), zap.String("prompt location", promptPath))
+		}
 
 		log.Info("Insert LLM response into response file", zap.String("response location", responsePath))
 
@@ -107,6 +120,7 @@ func init() {
 	rootCmd.PersistentFlags().StringP("repo-name", "n", "REPO-NAME", "name of repository on version control server")
 	rootCmd.PersistentFlags().StringP("github-token", "t", "GITHUB TOKEN", "token for authenticating Github actions")
 	rootCmd.PersistentFlags().StringP("local-repo-path", "l", "/tmp/pullpalrepo/", "path where pull pal will check out a local copy of the repository")
+	rootCmd.PersistentFlags().BoolP("prompt-to-clipboard", "c", false, "whether to copy LLM prompt to clipboard rather than using a file")
 	rootCmd.PersistentFlags().StringP("prompt-path", "p", "./path/to/prompt.txt", "path where pull pal will write the llm prompt")
 	rootCmd.PersistentFlags().StringP("response-path", "r", "./path/to/response.txt", "path where pull pal will read the llm response from")
 
@@ -117,6 +131,7 @@ func init() {
 	viper.BindPFlag("repo-name", rootCmd.PersistentFlags().Lookup("repo-name"))
 	viper.BindPFlag("github-token", rootCmd.PersistentFlags().Lookup("github-token"))
 	viper.BindPFlag("local-repo-path", rootCmd.PersistentFlags().Lookup("local-repo-path"))
+	viper.BindPFlag("prompt-to-clipboard", rootCmd.PersistentFlags().Lookup("prompt-to-clipboard"))
 	viper.BindPFlag("prompt-path", rootCmd.PersistentFlags().Lookup("prompt-path"))
 	viper.BindPFlag("response-path", rootCmd.PersistentFlags().Lookup("response-path"))
 }

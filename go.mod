@@ -3,6 +3,7 @@ module github.com/mobyvb/pull-pal
 go 1.20
 
 require (
+	github.com/atotto/clipboard v0.1.4
 	github.com/go-git/go-git/v5 v5.6.1
 	github.com/google/go-github v17.0.0+incompatible
 	github.com/spf13/cobra v1.7.0

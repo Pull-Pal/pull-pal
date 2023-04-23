@@ -9,6 +9,7 @@ import (
 	"github.com/mobyvb/pull-pal/llm"
 	"github.com/mobyvb/pull-pal/vc"
 
+	"github.com/atotto/clipboard"
 	"go.uber.org/zap"
 )
 
@@ -55,6 +56,22 @@ func (p *PullPal) PickIssueToFile(promptPath string) (issue vc.Issue, changeRequ
 	}
 
 	err = ioutil.WriteFile(promptPath, []byte(prompt), 0644)
+	return issue, changeRequest, err
+}
+
+// PickIssueToClipboard is the same as PickIssue, but the changeRequest is converted to a string and copied to the clipboard.
+func (p *PullPal) PickIssueToClipboard(promptPath string) (issue vc.Issue, changeRequest llm.CodeChangeRequest, err error) {
+	issue, changeRequest, err = p.PickIssue()
+	if err != nil {
+		return issue, changeRequest, err
+	}
+
+	prompt, err := changeRequest.GetPrompt()
+	if err != nil {
+		return issue, changeRequest, err
+	}
+
+	err = clipboard.WriteAll(prompt)
 	return issue, changeRequest, err
 }
 
