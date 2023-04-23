@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -36,10 +37,14 @@ It can be used to:
 		promptToClipboard := viper.GetBool("prompt-to-clipboard")
 		responsePath := viper.GetString("response-path")
 
-		log, err := zap.NewProduction()
-		if err != nil {
-			panic(err)
-		}
+		/*
+			log, err := zap.NewProduction()
+			if err != nil {
+				panic(err)
+			}
+		*/
+
+		log := zap.L()
 
 		author := vc.Author{
 			Email:  selfEmail,
@@ -56,43 +61,69 @@ It can be used to:
 		}
 		p, err := pullpal.NewPullPal(cmd.Context(), log.Named("pullpal"), author, repo)
 		if err != nil {
-			log.Error("error creating new pull pal", zap.Error(err))
+			fmt.Println("error creating new pull pal", err)
 			return
 		}
-		log.Info("Successfully initialized pull pal")
+		fmt.Println("Successfully initialized pull pal")
 
-		var issue vc.Issue
-		var changeRequest llm.CodeChangeRequest
-		if promptToClipboard {
-			issue, changeRequest, err = p.PickIssueToClipboard(promptPath)
+		// TODO this loop breaks on the second iteration due to a weird git state or something
+		for {
+			var input string
+			fmt.Println("Press 'enter' when ready to select issue. Type 'exit' to exit.")
+			fmt.Scanln(&input)
+			if input == "exit" {
+				break
+			}
+
+			var issue vc.Issue
+			var changeRequest llm.CodeChangeRequest
+			if promptToClipboard {
+				issue, changeRequest, err = p.PickIssueToClipboard(promptPath)
+				if err != nil {
+					if !errors.Is(err, pullpal.IssueNotFound) {
+						fmt.Println("error selecting issue and/or generating prompt", err)
+						return
+					} else {
+						fmt.Println("No issues found. Proceeding to parse prompt")
+					}
+				} else {
+					fmt.Printf("Picked issue and copied prompt to clipboard. Issue #%s\n", issue.ID)
+				}
+			} else {
+				issue, changeRequest, err = p.PickIssueToFile(promptPath)
+				if err != nil {
+					if !errors.Is(err, pullpal.IssueNotFound) {
+						fmt.Println("error selecting issue and/or generating prompt", err)
+						return
+					}
+					fmt.Println("No issues found. Proceeding to parse prompt")
+				} else {
+					fmt.Printf("Picked issue and copied prompt to clipboard. Issue #%s. Prompt location %s\n", issue.ID, promptPath)
+				}
+			}
+
+			fmt.Printf("\nInsert LLM response into response file: %s", responsePath)
+
+			fmt.Println("Press 'enter' when ready to parse response. Enter 'skip' to skip response parsing. Enter 'exit' to exit.")
+			fmt.Scanln(&input)
+			if input == "exit" {
+				break
+			}
+			if input == "skip" {
+				fmt.Println()
+				continue
+			}
+
+			prURL, err := p.ProcessResponseFromFile(changeRequest, responsePath)
 			if err != nil {
-				log.Error("error selecting issue and/or generating prompt", zap.Error(err))
+				fmt.Println("error parsing LLM response and/or making version control changes", err)
 				return
 			}
 
-			log.Info("Picked issue and copied prompt to clipboard", zap.String("issue ID", issue.ID))
-		} else {
-			issue, changeRequest, err = p.PickIssueToFile(promptPath)
-			if err != nil {
-				log.Error("error selecting issue and/or generating prompt", zap.Error(err))
-				return
-			}
-			log.Info("Picked issue and created prompt", zap.String("issue ID", issue.ID), zap.String("prompt location", promptPath))
+			fmt.Printf("Successfully opened a code change request. Link: %s\n", prURL)
 		}
 
-		log.Info("Insert LLM response into response file", zap.String("response location", responsePath))
-
-		var input string
-		log.Info("Press 'enter' when done.")
-		fmt.Scanln(&input)
-
-		prURL, err := p.ProcessResponseFromFile(changeRequest, responsePath)
-		if err != nil {
-			log.Error("error parsing LLM response and/or making version control changes", zap.Error(err))
-			return
-		}
-
-		log.Info("Successfully opened a code change request", zap.String("Github PR link", prURL))
+		fmt.Println("Done. Thank you!")
 	},
 }
 
@@ -137,13 +168,11 @@ func init() {
 }
 
 func initConfig() {
-	fmt.Println("init")
 	if cfgFile != "" {
 		fmt.Println("cfg file exists")
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
 	} else {
-		fmt.Println("cfg file empty")
 		// Find home directory.
 		home, err := os.UserHomeDir()
 		cobra.CheckErr(err)
