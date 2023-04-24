@@ -44,8 +44,8 @@ func NewPullPal(ctx context.Context, log *zap.Logger, self vc.Author, repo vc.Re
 var IssueNotFound = errors.New("no issue found")
 
 // PickIssueToFile is the same as PickIssue, but the changeRequest is converted to a string and written to a file.
-func (p *PullPal) PickIssueToFile(promptPath string) (issue vc.Issue, changeRequest llm.CodeChangeRequest, err error) {
-	issue, changeRequest, err = p.PickIssue()
+func (p *PullPal) PickIssueToFile(listIssueOptions vc.ListIssueOptions, promptPath string) (issue vc.Issue, changeRequest llm.CodeChangeRequest, err error) {
+	issue, changeRequest, err = p.PickIssue(listIssueOptions)
 	if err != nil {
 		return issue, changeRequest, err
 	}
@@ -60,8 +60,8 @@ func (p *PullPal) PickIssueToFile(promptPath string) (issue vc.Issue, changeRequ
 }
 
 // PickIssueToClipboard is the same as PickIssue, but the changeRequest is converted to a string and copied to the clipboard.
-func (p *PullPal) PickIssueToClipboard(promptPath string) (issue vc.Issue, changeRequest llm.CodeChangeRequest, err error) {
-	issue, changeRequest, err = p.PickIssue()
+func (p *PullPal) PickIssueToClipboard(listIssueOptions vc.ListIssueOptions) (issue vc.Issue, changeRequest llm.CodeChangeRequest, err error) {
+	issue, changeRequest, err = p.PickIssue(listIssueOptions)
 	if err != nil {
 		return issue, changeRequest, err
 	}
@@ -76,9 +76,9 @@ func (p *PullPal) PickIssueToClipboard(promptPath string) (issue vc.Issue, chang
 }
 
 // PickIssue selects an issue from the version control server and returns the selected issue, as well as the LLM prompt needed to fulfill the request.
-func (p *PullPal) PickIssue() (issue vc.Issue, changeRequest llm.CodeChangeRequest, err error) {
+func (p *PullPal) PickIssue(listIssueOptions vc.ListIssueOptions) (issue vc.Issue, changeRequest llm.CodeChangeRequest, err error) {
 	// TODO I should be able to pass in settings for listing issues from here
-	issues, err := p.vcClient.ListOpenIssues()
+	issues, err := p.vcClient.ListOpenIssues(listIssueOptions)
 	if err != nil {
 		return issue, changeRequest, err
 	}
@@ -153,4 +153,17 @@ func (p *PullPal) ProcessResponse(codeChangeRequest llm.CodeChangeRequest, llmRe
 	// 3. open code change request
 	_, url, err = p.vcClient.OpenCodeChangeRequest(codeChangeRequest, codeChangeResponse)
 	return url, err
+}
+
+// ListIssues gets a list of all issues meeting the provided criteria.
+func (p *PullPal) ListIssues(handles, labels []string) ([]vc.Issue, error) {
+	issues, err := p.vcClient.ListOpenIssues(vc.ListIssueOptions{
+		Handles: handles,
+		Labels:  labels,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return issues, nil
 }

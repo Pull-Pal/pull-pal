@@ -17,6 +17,40 @@ type Issue struct {
 	Author  Author
 }
 
+func (i Issue) String() string {
+	return fmt.Sprintf("Issue ID: %s\nAuthor: %s\nSubject: %s\nBody:\n%s\nURL: %s\n", i.ID, i.Author.Handle, i.Subject, i.Body, i.URL)
+}
+
+// ListIssueOptions defines options for listing issues.
+type ListIssueOptions struct {
+	// Labels defines the list of labels an issue must have in order to be listed
+	// The issue must have *every* label provided.
+	Labels []string
+	// Handles defines the list of usernames to list issues from
+	// The issue can be created by *any* user provided.
+	Handles []string
+}
+
+// Comment represents a comment on a code change request.
+// TODO comments on issue?
+type Comment struct {
+	// ChangeID is the local identifier for the code change request this comment was left on (e.g. Github PR number)
+	ChangeID string
+	// Line is the contents of the code on the line where this comment was left
+	Line   string
+	Body   string
+	Author Author
+}
+
+// ListCommentOptions defines options for listing comments.
+type ListCommentOptions struct {
+	// ChangeID is the local identifier for the code change request to list comments from (e.g. Github PR number)
+	ChangeID string
+	// Handles defines the list of usernames to list comments from
+	// The comment can be created by *any* user provided.
+	Handles []string
+}
+
 // Author represents a commit, issue, or code change request author on a version control server.
 type Author struct {
 	Email  string
@@ -45,8 +79,10 @@ func (repo Repository) HTTPS() string {
 
 // VCClient is an interface for version control server's client, e.g. a Github or Gerrit client.
 type VCClient interface {
-	// ListOpenIssues lists unresolved issues on the version control server.
-	ListOpenIssues() ([]Issue, error)
+	// ListOpenIssues lists unresolved issues meeting the provided criteria on the version control server.
+	ListOpenIssues(opts ListIssueOptions) ([]Issue, error)
+	// ListOpenComments lists unresolved comments meeting the provided criteria on the version control server.
+	ListOpenComments(opts ListCommentOptions) ([]Comment, error)
 	// OpenCodeChangeRequest opens a new "code change request" on the version control server (e.g. "pull request" in Github).
 	OpenCodeChangeRequest(req llm.CodeChangeRequest, res llm.CodeChangeResponse) (id, url string, err error)
 	// UpdateCodeChangeRequest updates an existing code change request on the version control server.

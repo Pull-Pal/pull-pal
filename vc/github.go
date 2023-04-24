@@ -166,17 +166,27 @@ func randomBranchName() string {
 }
 
 // ListOpenIssues lists unresolved issues in the Github repository.
-func (gc *GithubClient) ListOpenIssues() ([]Issue, error) {
+func (gc *GithubClient) ListOpenIssues(options ListIssueOptions) ([]Issue, error) {
 	// List and parse GitHub issues
-	issues, _, err := gc.client.Issues.ListByRepo(gc.ctx, gc.repo.Owner.Handle, gc.repo.Name, nil)
+	opt := &github.IssueListByRepoOptions{
+		Labels: options.Labels,
+	}
+	issues, _, err := gc.client.Issues.ListByRepo(gc.ctx, gc.repo.Owner.Handle, gc.repo.Name, opt)
 	if err != nil {
 		return nil, err
 	}
 
 	toReturn := []Issue{}
 	for _, issue := range issues {
-		// TODO make this filtering configurable from outside
-		if issue.GetUser().GetLogin() != gc.repo.Owner.Handle {
+		issueUser := issue.GetUser().GetLogin()
+		allowedUser := false
+		for _, u := range options.Handles {
+			if issueUser == u {
+				allowedUser = true
+				break
+			}
+		}
+		if !allowedUser {
 			continue
 		}
 
@@ -194,6 +204,11 @@ func (gc *GithubClient) ListOpenIssues() ([]Issue, error) {
 	}
 
 	return toReturn, nil
+}
+
+// ListOpenComments lists unresolved comments in the Github repository.
+func (gc *GithubClient) ListOpenComments(options ListCommentOptions) ([]Comment, error) {
+	return nil, nil
 }
 
 // GetLocalFile gets the current representation of the file at the provided path from the local git repo.

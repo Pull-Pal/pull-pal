@@ -8,10 +8,54 @@ import (
 	"github.com/mobyvb/pull-pal/llm"
 	"github.com/mobyvb/pull-pal/pullpal"
 	"github.com/mobyvb/pull-pal/vc"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
+
+// todo: some of this config definition/usage can be moved to other packages
+type config struct {
+	// bot credentials + github info
+	selfHandle  string
+	selfEmail   string
+	githubToken string
+
+	// remote repo info
+	repoDomain string
+	repoHandle string
+	repoName   string
+
+	// local paths
+	localRepoPath string
+	promptPath    string
+	responsePath  string
+
+	// program settings
+	promptToClipboard   bool
+	usersToListenTo     []string
+	requiredIssueLabels []string
+}
+
+func getConfig() config {
+	return config{
+		selfHandle:  viper.GetString("handle"),
+		selfEmail:   viper.GetString("email"),
+		githubToken: viper.GetString("github-token"),
+
+		repoDomain: viper.GetString("repo-domain"),
+		repoHandle: viper.GetString("repo-handle"),
+		repoName:   viper.GetString("repo-name"),
+
+		localRepoPath: viper.GetString("local-repo-path"),
+		promptPath:    viper.GetString("prompt-path"),
+		responsePath:  viper.GetString("response-path"),
+
+		promptToClipboard:   viper.GetBool("prompt-to-clipboard"),
+		usersToListenTo:     viper.GetStringSlice("users-to-listen-to"),
+		requiredIssueLabels: viper.GetStringSlice("required-issue-labels"),
+	}
+}
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -26,16 +70,7 @@ It can be used to:
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
-		selfHandle := viper.GetString("handle")
-		selfEmail := viper.GetString("email")
-		repoDomain := viper.GetString("repo-domain")
-		repoHandle := viper.GetString("repo-handle")
-		repoName := viper.GetString("repo-name")
-		githubToken := viper.GetString("github-token")
-		localRepoPath := viper.GetString("local-repo-path")
-		promptPath := viper.GetString("prompt-path")
-		promptToClipboard := viper.GetBool("prompt-to-clipboard")
-		responsePath := viper.GetString("response-path")
+		cfg := getConfig()
 
 		/*
 			log, err := zap.NewProduction()
@@ -47,16 +82,16 @@ It can be used to:
 		log := zap.L()
 
 		author := vc.Author{
-			Email:  selfEmail,
-			Handle: selfHandle,
-			Token:  githubToken,
+			Email:  cfg.selfEmail,
+			Handle: cfg.selfHandle,
+			Token:  cfg.githubToken,
 		}
 		repo := vc.Repository{
-			LocalPath:  localRepoPath,
-			HostDomain: repoDomain,
-			Name:       repoName,
+			LocalPath:  cfg.localRepoPath,
+			HostDomain: cfg.repoDomain,
+			Name:       cfg.repoName,
 			Owner: vc.Author{
-				Handle: repoHandle,
+				Handle: cfg.repoHandle,
 			},
 		}
 		p, err := pullpal.NewPullPal(cmd.Context(), log.Named("pullpal"), author, repo)
@@ -77,8 +112,11 @@ It can be used to:
 
 			var issue vc.Issue
 			var changeRequest llm.CodeChangeRequest
-			if promptToClipboard {
-				issue, changeRequest, err = p.PickIssueToClipboard(promptPath)
+			if cfg.promptToClipboard {
+				issue, changeRequest, err = p.PickIssueToClipboard(vc.ListIssueOptions{
+					Handles: cfg.usersToListenTo,
+					Labels:  cfg.requiredIssueLabels,
+				})
 				if err != nil {
 					if !errors.Is(err, pullpal.IssueNotFound) {
 						fmt.Println("error selecting issue and/or generating prompt", err)
@@ -90,7 +128,10 @@ It can be used to:
 					fmt.Printf("Picked issue and copied prompt to clipboard. Issue #%s\n", issue.ID)
 				}
 			} else {
-				issue, changeRequest, err = p.PickIssueToFile(promptPath)
+				issue, changeRequest, err = p.PickIssueToFile(vc.ListIssueOptions{
+					Handles: cfg.usersToListenTo,
+					Labels:  cfg.requiredIssueLabels,
+				}, cfg.promptPath)
 				if err != nil {
 					if !errors.Is(err, pullpal.IssueNotFound) {
 						fmt.Println("error selecting issue and/or generating prompt", err)
@@ -98,11 +139,11 @@ It can be used to:
 					}
 					fmt.Println("No issues found. Proceeding to parse prompt")
 				} else {
-					fmt.Printf("Picked issue and copied prompt to clipboard. Issue #%s. Prompt location %s\n", issue.ID, promptPath)
+					fmt.Printf("Picked issue and copied prompt to clipboard. Issue #%s. Prompt location %s\n", issue.ID, cfg.promptPath)
 				}
 			}
 
-			fmt.Printf("\nInsert LLM response into response file: %s", responsePath)
+			fmt.Printf("\nInsert LLM response into response file: %s", cfg.responsePath)
 
 			fmt.Println("Press 'enter' when ready to parse response. Enter 'skip' to skip response parsing. Enter 'exit' to exit.")
 			fmt.Scanln(&input)
@@ -114,7 +155,7 @@ It can be used to:
 				continue
 			}
 
-			prURL, err := p.ProcessResponseFromFile(changeRequest, responsePath)
+			prURL, err := p.ProcessResponseFromFile(changeRequest, cfg.responsePath)
 			if err != nil {
 				fmt.Println("error parsing LLM response and/or making version control changes", err)
 				return
@@ -146,25 +187,35 @@ func init() {
 
 	rootCmd.PersistentFlags().StringP("handle", "u", "HANDLE", "handle to use for version control actions")
 	rootCmd.PersistentFlags().StringP("email", "e", "EMAIL", "email to use for version control actions")
+	rootCmd.PersistentFlags().StringP("github-token", "t", "GITHUB TOKEN", "token for authenticating Github actions")
+
 	rootCmd.PersistentFlags().StringP("repo-domain", "d", "github.com", "domain for version control server")
 	rootCmd.PersistentFlags().StringP("repo-handle", "o", "REPO-HANDLE", "handle of repository's owner on version control server")
 	rootCmd.PersistentFlags().StringP("repo-name", "n", "REPO-NAME", "name of repository on version control server")
-	rootCmd.PersistentFlags().StringP("github-token", "t", "GITHUB TOKEN", "token for authenticating Github actions")
+
 	rootCmd.PersistentFlags().StringP("local-repo-path", "l", "/tmp/pullpalrepo/", "path where pull pal will check out a local copy of the repository")
-	rootCmd.PersistentFlags().BoolP("prompt-to-clipboard", "c", false, "whether to copy LLM prompt to clipboard rather than using a file")
 	rootCmd.PersistentFlags().StringP("prompt-path", "p", "./path/to/prompt.txt", "path where pull pal will write the llm prompt")
 	rootCmd.PersistentFlags().StringP("response-path", "r", "./path/to/response.txt", "path where pull pal will read the llm response from")
 
+	rootCmd.PersistentFlags().BoolP("prompt-to-clipboard", "c", false, "whether to copy LLM prompt to clipboard rather than using a file")
+	rootCmd.PersistentFlags().StringSliceP("users-to-listen-to", "a", []string{}, "a list of Github users that Pull Pal will respond to")
+	rootCmd.PersistentFlags().StringSliceP("required-issue-labels", "i", []string{}, "a list of labels that are required for Pull Pal to select an issue")
+
 	viper.BindPFlag("handle", rootCmd.PersistentFlags().Lookup("handle"))
 	viper.BindPFlag("email", rootCmd.PersistentFlags().Lookup("email"))
+	viper.BindPFlag("github-token", rootCmd.PersistentFlags().Lookup("github-token"))
+
 	viper.BindPFlag("repo-domain", rootCmd.PersistentFlags().Lookup("repo-domain"))
 	viper.BindPFlag("repo-handle", rootCmd.PersistentFlags().Lookup("repo-handle"))
 	viper.BindPFlag("repo-name", rootCmd.PersistentFlags().Lookup("repo-name"))
-	viper.BindPFlag("github-token", rootCmd.PersistentFlags().Lookup("github-token"))
+
 	viper.BindPFlag("local-repo-path", rootCmd.PersistentFlags().Lookup("local-repo-path"))
-	viper.BindPFlag("prompt-to-clipboard", rootCmd.PersistentFlags().Lookup("prompt-to-clipboard"))
 	viper.BindPFlag("prompt-path", rootCmd.PersistentFlags().Lookup("prompt-path"))
 	viper.BindPFlag("response-path", rootCmd.PersistentFlags().Lookup("response-path"))
+
+	viper.BindPFlag("prompt-to-clipboard", rootCmd.PersistentFlags().Lookup("prompt-to-clipboard"))
+	viper.BindPFlag("users-to-listen-to", rootCmd.PersistentFlags().Lookup("users-to-listen-to"))
+	viper.BindPFlag("required-issue-labels", rootCmd.PersistentFlags().Lookup("required-issue-labels"))
 }
 
 func initConfig() {
