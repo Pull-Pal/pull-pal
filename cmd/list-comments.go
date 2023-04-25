@@ -10,13 +10,13 @@ import (
 	"go.uber.org/zap"
 )
 
-var listIssuesCmd = &cobra.Command{
-	Use:   "list-issues",
-	Short: "Lists github issues meeting the configured criteria",
-	Long:  "Lists github issues meeting the configured criteria",
+var listCommentsCmd = &cobra.Command{
+	Use:   "list-comments",
+	Short: "Lists comments on a Github PR meeting the configured criteria",
+	Long:  "Lists comments on a Github PR meeting the configured criteria",
+	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := getConfig()
-		fmt.Println("list issues called")
 
 		log := zap.L()
 
@@ -40,7 +40,8 @@ var listIssuesCmd = &cobra.Command{
 		}
 		fmt.Println("Successfully initialized pull pal")
 
-		issueList, err := p.ListIssues(cfg.usersToListenTo, cfg.requiredIssueLabels)
+		prID := args[0]
+		issueList, err := p.ListComments(prID, cfg.usersToListenTo)
 		if err != nil {
 			fmt.Println("error listing issues", err)
 			return
@@ -50,5 +51,5 @@ var listIssuesCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(listIssuesCmd)
+	rootCmd.AddCommand(listCommentsCmd)
 }

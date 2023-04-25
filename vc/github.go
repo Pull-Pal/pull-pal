@@ -208,7 +208,47 @@ func (gc *GithubClient) ListOpenIssues(options ListIssueOptions) ([]Issue, error
 
 // ListOpenComments lists unresolved comments in the Github repository.
 func (gc *GithubClient) ListOpenComments(options ListCommentOptions) ([]Comment, error) {
-	return nil, nil
+	toReturn := []Comment{}
+	prNumber, err := strconv.Atoi(options.ChangeID)
+	if err != nil {
+		return nil, err
+	}
+	comments, _, err := gc.client.PullRequests.ListComments(gc.ctx, gc.repo.Owner.Handle, gc.repo.Name, prNumber, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: filter out comments that "self" has already replied to
+	// TODO: ignore resolved comments
+	for _, c := range comments {
+		commentUser := c.GetUser().GetLogin()
+		allowedUser := false
+		for _, u := range options.Handles {
+			if commentUser == u {
+				allowedUser = true
+				break
+			}
+		}
+		if !allowedUser {
+			continue
+		}
+
+		nextComment := Comment{
+			ID:       strconv.FormatInt(c.GetID(), 10),
+			ChangeID: options.ChangeID,
+			URL:      c.GetHTMLURL(),
+			Author: Author{
+				Email:  c.GetUser().GetEmail(),
+				Handle: c.GetUser().GetLogin(),
+			},
+			Body:     c.GetBody(),
+			Position: c.GetPosition(),
+			DiffHunk: c.GetDiffHunk(),
+		}
+		toReturn = append(toReturn, nextComment)
+	}
+
+	return toReturn, nil
 }
 
 // GetLocalFile gets the current representation of the file at the provided path from the local git repo.

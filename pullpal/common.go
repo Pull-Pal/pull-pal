@@ -167,3 +167,16 @@ func (p *PullPal) ListIssues(handles, labels []string) ([]vc.Issue, error) {
 
 	return issues, nil
 }
+
+// ListComments gets a list of all comments meeting the provided criteria on a PR.
+func (p *PullPal) ListComments(changeID string, handles []string) ([]vc.Comment, error) {
+	comments, err := p.vcClient.ListOpenComments(vc.ListCommentOptions{
+		ChangeID: changeID,
+		Handles:  handles,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return comments, nil
+}

@@ -34,12 +34,18 @@ type ListIssueOptions struct {
 // Comment represents a comment on a code change request.
 // TODO comments on issue?
 type Comment struct {
+	ID string
 	// ChangeID is the local identifier for the code change request this comment was left on (e.g. Github PR number)
 	ChangeID string
-	// Line is the contents of the code on the line where this comment was left
-	Line   string
-	Body   string
-	Author Author
+	Author   Author
+	Body     string
+	Position int
+	DiffHunk string
+	URL      string
+}
+
+func (c Comment) String() string {
+	return fmt.Sprintf("Comment ID: %s\nAuthor: %s\nBody: %s\nPosition: %d\n\nDiffHunk:\n%s\n\nURL: %s\n", c.ID, c.Author.Handle, c.Body, c.Position, c.DiffHunk, c.URL)
 }
 
 // ListCommentOptions defines options for listing comments.
