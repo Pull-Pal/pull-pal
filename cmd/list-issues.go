@@ -3,11 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/mobyvb/pull-pal/pullpal"
-	"github.com/mobyvb/pull-pal/vc"
-
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 )
 
 var listIssuesCmd = &cobra.Command{
@@ -16,24 +12,8 @@ var listIssuesCmd = &cobra.Command{
 	Long:  "Lists github issues meeting the configured criteria",
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := getConfig()
-		fmt.Println("list issues called")
 
-		log := zap.L()
-
-		author := vc.Author{
-			Email:  cfg.selfEmail,
-			Handle: cfg.selfHandle,
-			Token:  cfg.githubToken,
-		}
-		repo := vc.Repository{
-			LocalPath:  cfg.localRepoPath,
-			HostDomain: cfg.repoDomain,
-			Name:       cfg.repoName,
-			Owner: vc.Author{
-				Handle: cfg.repoHandle,
-			},
-		}
-		p, err := pullpal.NewPullPal(cmd.Context(), log.Named("pullpal"), author, repo)
+		p, err := getPullPal(cmd.Context(), cfg)
 		if err != nil {
 			fmt.Println("error creating new pull pal", err)
 			return

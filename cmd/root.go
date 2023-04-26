@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -8,10 +9,10 @@ import (
 	"github.com/mobyvb/pull-pal/llm"
 	"github.com/mobyvb/pull-pal/pullpal"
 	"github.com/mobyvb/pull-pal/vc"
+	"go.uber.org/zap"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"go.uber.org/zap"
 )
 
 // todo: some of this config definition/usage can be moved to other packages
@@ -20,6 +21,7 @@ type config struct {
 	selfHandle  string
 	selfEmail   string
 	githubToken string
+	openAIToken string
 
 	// remote repo info
 	repoDomain string
@@ -42,6 +44,7 @@ func getConfig() config {
 		selfHandle:  viper.GetString("handle"),
 		selfEmail:   viper.GetString("email"),
 		githubToken: viper.GetString("github-token"),
+		openAIToken: viper.GetString("open-ai-token"),
 
 		repoDomain: viper.GetString("repo-domain"),
 		repoHandle: viper.GetString("repo-handle"),
@@ -55,6 +58,33 @@ func getConfig() config {
 		usersToListenTo:     viper.GetStringSlice("users-to-listen-to"),
 		requiredIssueLabels: viper.GetStringSlice("required-issue-labels"),
 	}
+}
+
+func getPullPal(ctx context.Context, cfg config) (*pullpal.PullPal, error) {
+	/*
+		log, err := zap.NewProduction()
+		if err != nil {
+			panic(err)
+		}
+	*/
+	log := zap.L()
+
+	author := vc.Author{
+		Email:  cfg.selfEmail,
+		Handle: cfg.selfHandle,
+		Token:  cfg.githubToken,
+	}
+	repo := vc.Repository{
+		LocalPath:  cfg.localRepoPath,
+		HostDomain: cfg.repoDomain,
+		Name:       cfg.repoName,
+		Owner: vc.Author{
+			Handle: cfg.repoHandle,
+		},
+	}
+	p, err := pullpal.NewPullPal(ctx, log.Named("pullpal"), author, repo, cfg.openAIToken)
+
+	return p, err
 }
 
 // rootCmd represents the base command when called without any subcommands
@@ -72,29 +102,7 @@ It can be used to:
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := getConfig()
 
-		/*
-			log, err := zap.NewProduction()
-			if err != nil {
-				panic(err)
-			}
-		*/
-
-		log := zap.L()
-
-		author := vc.Author{
-			Email:  cfg.selfEmail,
-			Handle: cfg.selfHandle,
-			Token:  cfg.githubToken,
-		}
-		repo := vc.Repository{
-			LocalPath:  cfg.localRepoPath,
-			HostDomain: cfg.repoDomain,
-			Name:       cfg.repoName,
-			Owner: vc.Author{
-				Handle: cfg.repoHandle,
-			},
-		}
-		p, err := pullpal.NewPullPal(cmd.Context(), log.Named("pullpal"), author, repo)
+		p, err := getPullPal(cmd.Context(), cfg)
 		if err != nil {
 			fmt.Println("error creating new pull pal", err)
 			return
@@ -188,6 +196,7 @@ func init() {
 	rootCmd.PersistentFlags().StringP("handle", "u", "HANDLE", "handle to use for version control actions")
 	rootCmd.PersistentFlags().StringP("email", "e", "EMAIL", "email to use for version control actions")
 	rootCmd.PersistentFlags().StringP("github-token", "t", "GITHUB TOKEN", "token for authenticating Github actions")
+	rootCmd.PersistentFlags().StringP("open-ai-token", "k", "OPENAI TOKEN", "token for authenticating OpenAI")
 
 	rootCmd.PersistentFlags().StringP("repo-domain", "d", "github.com", "domain for version control server")
 	rootCmd.PersistentFlags().StringP("repo-handle", "o", "REPO-HANDLE", "handle of repository's owner on version control server")
@@ -204,6 +213,7 @@ func init() {
 	viper.BindPFlag("handle", rootCmd.PersistentFlags().Lookup("handle"))
 	viper.BindPFlag("email", rootCmd.PersistentFlags().Lookup("email"))
 	viper.BindPFlag("github-token", rootCmd.PersistentFlags().Lookup("github-token"))
+	viper.BindPFlag("open-ai-token", rootCmd.PersistentFlags().Lookup("open-ai-token"))
 
 	viper.BindPFlag("repo-domain", rootCmd.PersistentFlags().Lookup("repo-domain"))
 	viper.BindPFlag("repo-handle", rootCmd.PersistentFlags().Lookup("repo-handle"))

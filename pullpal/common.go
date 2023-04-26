@@ -3,6 +3,7 @@ package pullpal
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"strings"
 
@@ -22,12 +23,18 @@ type PullPal struct {
 	ctx context.Context
 	log *zap.Logger
 
-	vcClient vc.VCClient
+	vcClient       vc.VCClient
+	localGitClient *vc.LocalGitClient
+	openAIClient   *llm.OpenAIClient
 }
 
 // NewPullPal creates a new "pull pal service", including setting up local version control and LLM integrations.
-func NewPullPal(ctx context.Context, log *zap.Logger, self vc.Author, repo vc.Repository) (*PullPal, error) {
+func NewPullPal(ctx context.Context, log *zap.Logger, self vc.Author, repo vc.Repository, openAIToken string) (*PullPal, error) {
 	ghClient, err := vc.NewGithubClient(ctx, log, self, repo)
+	if err != nil {
+		return nil, err
+	}
+	localGitClient, err := vc.NewLocalGitClient(self, repo)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +43,9 @@ func NewPullPal(ctx context.Context, log *zap.Logger, self vc.Author, repo vc.Re
 		ctx: ctx,
 		log: log,
 
-		vcClient: ghClient,
+		vcClient:       ghClient,
+		localGitClient: localGitClient,
+		openAIClient:   llm.NewOpenAIClient(openAIToken),
 	}, nil
 }
 
@@ -179,4 +188,44 @@ func (p *PullPal) ListComments(changeID string, handles []string) ([]vc.Comment,
 	}
 
 	return comments, nil
+}
+
+func (p *PullPal) MakeLocalChange(issue vc.Issue) error {
+	// remove file list from issue body
+	// TODO do this better
+	parts := strings.Split(issue.Body, "Files:")
+	issue.Body = parts[0]
+
+	fileList := []string{}
+	if len(parts) > 1 {
+		fileList = strings.Split(parts[1], ",")
+	}
+
+	// get file contents from local git repository
+	files := []llm.File{}
+	for _, path := range fileList {
+		path = strings.TrimSpace(path)
+		nextFile, err := p.vcClient.GetLocalFile(path)
+		if err != nil {
+			return err
+		}
+		files = append(files, nextFile)
+	}
+
+	changeRequest := llm.CodeChangeRequest{
+		Subject: issue.Subject,
+		Body:    issue.Body,
+		IssueID: issue.ID,
+		Files:   files,
+	}
+
+	res, err := p.openAIClient.EvaluateCCR(p.ctx, changeRequest)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("response from openai")
+	fmt.Println(res)
+
+	return nil
 }
