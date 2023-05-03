@@ -61,13 +61,11 @@ func getConfig() config {
 }
 
 func getPullPal(ctx context.Context, cfg config) (*pullpal.PullPal, error) {
-	/*
-		log, err := zap.NewProduction()
-		if err != nil {
-			panic(err)
-		}
-	*/
-	log := zap.L()
+	log, err := zap.NewProduction()
+	if err != nil {
+		panic(err)
+	}
+	//log := zap.L()
 
 	author := vc.Author{
 		Email:  cfg.selfEmail,
@@ -82,7 +80,11 @@ func getPullPal(ctx context.Context, cfg config) (*pullpal.PullPal, error) {
 			Handle: cfg.repoHandle,
 		},
 	}
-	p, err := pullpal.NewPullPal(ctx, log.Named("pullpal"), author, repo, cfg.openAIToken)
+	listIssueOptions := vc.ListIssueOptions{
+		Handles: cfg.usersToListenTo,
+		Labels:  cfg.requiredIssueLabels,
+	}
+	p, err := pullpal.NewPullPal(ctx, log.Named("pullpal"), listIssueOptions, author, repo, cfg.openAIToken)
 
 	return p, err
 }
@@ -121,10 +123,7 @@ It can be used to:
 			var issue vc.Issue
 			var changeRequest llm.CodeChangeRequest
 			if cfg.promptToClipboard {
-				issue, changeRequest, err = p.PickIssueToClipboard(vc.ListIssueOptions{
-					Handles: cfg.usersToListenTo,
-					Labels:  cfg.requiredIssueLabels,
-				})
+				issue, changeRequest, err = p.PickIssueToClipboard()
 				if err != nil {
 					if !errors.Is(err, pullpal.IssueNotFound) {
 						fmt.Println("error selecting issue and/or generating prompt", err)
@@ -136,10 +135,7 @@ It can be used to:
 					fmt.Printf("Picked issue and copied prompt to clipboard. Issue #%s\n", issue.ID)
 				}
 			} else {
-				issue, changeRequest, err = p.PickIssueToFile(vc.ListIssueOptions{
-					Handles: cfg.usersToListenTo,
-					Labels:  cfg.requiredIssueLabels,
-				}, cfg.promptPath)
+				issue, changeRequest, err = p.PickIssueToFile(cfg.promptPath)
 				if err != nil {
 					if !errors.Is(err, pullpal.IssueNotFound) {
 						fmt.Println("error selecting issue and/or generating prompt", err)

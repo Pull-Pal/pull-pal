@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strings"
+	"time"
 
 	"github.com/mobyvb/pull-pal/llm"
 	"github.com/mobyvb/pull-pal/vc"
@@ -14,14 +15,18 @@ import (
 	"go.uber.org/zap"
 )
 
+// IssueNotFound is returned when no issue can be found to generate a prompt for.
+var IssueNotFound = errors.New("no issue found")
+
 // PullPal is the service responsible for:
 //  * Interacting with git server (e.g. reading issues and making PRs on Github)
 //  * Generating LLM prompts
 //  * Parsing LLM responses
 //  * Interacting with LLM (e.g. with GPT via OpenAI API)
 type PullPal struct {
-	ctx context.Context
-	log *zap.Logger
+	ctx              context.Context
+	log              *zap.Logger
+	listIssueOptions vc.ListIssueOptions
 
 	vcClient       vc.VCClient
 	localGitClient *vc.LocalGitClient
@@ -29,7 +34,7 @@ type PullPal struct {
 }
 
 // NewPullPal creates a new "pull pal service", including setting up local version control and LLM integrations.
-func NewPullPal(ctx context.Context, log *zap.Logger, self vc.Author, repo vc.Repository, openAIToken string) (*PullPal, error) {
+func NewPullPal(ctx context.Context, log *zap.Logger, listIssueOptions vc.ListIssueOptions, self vc.Author, repo vc.Repository, openAIToken string) (*PullPal, error) {
 	ghClient, err := vc.NewGithubClient(ctx, log, self, repo)
 	if err != nil {
 		return nil, err
@@ -40,8 +45,9 @@ func NewPullPal(ctx context.Context, log *zap.Logger, self vc.Author, repo vc.Re
 	}
 
 	return &PullPal{
-		ctx: ctx,
-		log: log,
+		ctx:              ctx,
+		log:              log,
+		listIssueOptions: listIssueOptions,
 
 		vcClient:       ghClient,
 		localGitClient: localGitClient,
@@ -49,12 +55,103 @@ func NewPullPal(ctx context.Context, log *zap.Logger, self vc.Author, repo vc.Re
 	}, nil
 }
 
-// IssueNotFound is returned when no issue can be found to generate a prompt for.
-var IssueNotFound = errors.New("no issue found")
+// Run starts pull pal as a fully automated service that periodically requests changes and creates pull requests based on them.
+func (p *PullPal) Run() error {
+	p.log.Info("Starting Pull Pal")
+	// TODO gracefully handle context cancelation
+	for {
+		issues, err := p.vcClient.ListOpenIssues(p.listIssueOptions)
+		if err != nil {
+			p.log.Error("error listing issues", zap.Error(err))
+			continue
+		}
+
+		if len(issues) == 0 {
+			// todo don't sleep
+			p.log.Info("no issues found. sleeping for 5 mins")
+			time.Sleep(5 * time.Minute)
+			continue
+		}
+
+		issue := issues[0]
+
+		// remove file list from issue body
+		// TODO do this better and probably somewhere else
+		parts := strings.Split(issue.Body, "Files:")
+		issue.Body = parts[0]
+
+		fileList := []string{}
+		if len(parts) > 1 {
+			fileList = strings.Split(parts[1], ",")
+		}
+
+		// get file contents from local git repository
+		files := []llm.File{}
+		for _, path := range fileList {
+			path = strings.TrimSpace(path)
+			nextFile, err := p.vcClient.GetLocalFile(path)
+			if err != nil {
+				p.log.Error("error getting file from vcclient", zap.Error(err))
+				continue
+			}
+			files = append(files, nextFile)
+		}
+
+		changeRequest := llm.CodeChangeRequest{
+			Subject: issue.Subject,
+			Body:    issue.Body,
+			IssueID: issue.ID,
+			Files:   files,
+		}
+
+		changeResponse, err := p.openAIClient.EvaluateCCR(p.ctx, changeRequest)
+		if err != nil {
+			p.log.Error("error getting response from openai", zap.Error(err))
+			continue
+
+		}
+
+		// parse llm response
+		//codeChangeResponse := llm.ParseCodeChangeResponse(llmResponse)
+
+		// create commit with file changes
+		err = p.vcClient.StartCommit()
+		if err != nil {
+			p.log.Error("error starting commit", zap.Error(err))
+			continue
+		}
+		for _, f := range changeResponse.Files {
+			err = p.vcClient.ReplaceOrAddLocalFile(f)
+			if err != nil {
+				p.log.Error("error replacing or adding file", zap.Error(err))
+				continue
+			}
+		}
+
+		commitMessage := changeRequest.Subject + "\n\n" + changeResponse.Notes + "\n\nResolves: #" + changeRequest.IssueID
+		err = p.vcClient.FinishCommit(commitMessage)
+		if err != nil {
+			p.log.Error("error finshing commit", zap.Error(err))
+			continue
+		}
+
+		// open code change request
+		_, url, err := p.vcClient.OpenCodeChangeRequest(changeRequest, changeResponse)
+		if err != nil {
+			p.log.Error("error opening PR", zap.Error(err))
+		}
+		p.log.Info("successfully created PR", zap.String("URL", url))
+
+		p.log.Info("going to sleep for five mins")
+		time.Sleep(5 * time.Minute)
+	}
+
+	return nil
+}
 
 // PickIssueToFile is the same as PickIssue, but the changeRequest is converted to a string and written to a file.
-func (p *PullPal) PickIssueToFile(listIssueOptions vc.ListIssueOptions, promptPath string) (issue vc.Issue, changeRequest llm.CodeChangeRequest, err error) {
-	issue, changeRequest, err = p.PickIssue(listIssueOptions)
+func (p *PullPal) PickIssueToFile(promptPath string) (issue vc.Issue, changeRequest llm.CodeChangeRequest, err error) {
+	issue, changeRequest, err = p.PickIssue()
 	if err != nil {
 		return issue, changeRequest, err
 	}
@@ -69,8 +166,8 @@ func (p *PullPal) PickIssueToFile(listIssueOptions vc.ListIssueOptions, promptPa
 }
 
 // PickIssueToClipboard is the same as PickIssue, but the changeRequest is converted to a string and copied to the clipboard.
-func (p *PullPal) PickIssueToClipboard(listIssueOptions vc.ListIssueOptions) (issue vc.Issue, changeRequest llm.CodeChangeRequest, err error) {
-	issue, changeRequest, err = p.PickIssue(listIssueOptions)
+func (p *PullPal) PickIssueToClipboard() (issue vc.Issue, changeRequest llm.CodeChangeRequest, err error) {
+	issue, changeRequest, err = p.PickIssue()
 	if err != nil {
 		return issue, changeRequest, err
 	}
@@ -85,9 +182,9 @@ func (p *PullPal) PickIssueToClipboard(listIssueOptions vc.ListIssueOptions) (is
 }
 
 // PickIssue selects an issue from the version control server and returns the selected issue, as well as the LLM prompt needed to fulfill the request.
-func (p *PullPal) PickIssue(listIssueOptions vc.ListIssueOptions) (issue vc.Issue, changeRequest llm.CodeChangeRequest, err error) {
+func (p *PullPal) PickIssue() (issue vc.Issue, changeRequest llm.CodeChangeRequest, err error) {
 	// TODO I should be able to pass in settings for listing issues from here
-	issues, err := p.vcClient.ListOpenIssues(listIssueOptions)
+	issues, err := p.vcClient.ListOpenIssues(p.listIssueOptions)
 	if err != nil {
 		return issue, changeRequest, err
 	}
