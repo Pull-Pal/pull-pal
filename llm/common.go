@@ -91,14 +91,19 @@ func parseFiles(filesSection string) []File {
 	// first item in the list is just gonna be "Files:"
 	fileStringList = fileStringList[1:]
 
+	replacer := strings.NewReplacer(
+		"\\n", "\n",
+		"\\\"", "\"",
+		"```", "",
+	)
 	fileList := make([]File, len(fileStringList))
 	for i, f := range fileStringList {
 		fileParts := strings.Split(f, "contents:")
-		path := strings.TrimSpace(fileParts[0])
-		// TODO currently, copy-pasting code from chatgpt also copies some additional text
-		// the following separates this unintended section from the actual intended contents of the file
-		contentParts := strings.Split(fileParts[1], "Copy code")
-		contents := strings.TrimSpace(contentParts[1])
+		path := replacer.Replace(fileParts[0])
+		path = strings.TrimSpace(path)
+
+		contents := replacer.Replace(fileParts[1])
+		contents = strings.TrimSpace(contents)
 
 		fileList[i] = File{
 			Path:     path,

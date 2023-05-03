@@ -51,7 +51,7 @@ func NewPullPal(ctx context.Context, log *zap.Logger, listIssueOptions vc.ListIs
 
 		vcClient:       ghClient,
 		localGitClient: localGitClient,
-		openAIClient:   llm.NewOpenAIClient(openAIToken),
+		openAIClient:   llm.NewOpenAIClient(log.Named("openaiClient"), openAIToken),
 	}, nil
 }
 
