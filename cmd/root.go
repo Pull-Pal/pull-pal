@@ -159,13 +159,16 @@ It can be used to:
 				continue
 			}
 
-			prURL, err := p.ProcessResponseFromFile(changeRequest, cfg.responsePath)
-			if err != nil {
-				fmt.Println("error parsing LLM response and/or making version control changes", err)
-				return
-			}
+			/*
+				prURL, err := p.ProcessResponseFromFile(changeRequest, cfg.responsePath)
+				if err != nil {
+					fmt.Println("error parsing LLM response and/or making version control changes", err)
+					return
+				}
 
-			fmt.Printf("Successfully opened a code change request. Link: %s\n", prURL)
+				fmt.Printf("Successfully opened a code change request. Link: %s\n", prURL)
+			*/
+			_ = changeRequest
 		}
 
 		fmt.Println("Done. Thank you!")

@@ -3,8 +3,6 @@ package vc
 import (
 	"fmt"
 
-	"github.com/mobyvb/pull-pal/llm"
-
 	"github.com/go-git/go-git/v5"
 )
 
@@ -84,6 +82,7 @@ func (repo Repository) HTTPS() string {
 }
 
 // VCClient is an interface for version control server's client, e.g. a Github or Gerrit client.
+/*
 type VCClient interface {
 	// ListOpenIssues lists unresolved issues meeting the provided criteria on the version control server.
 	ListOpenIssues(opts ListIssueOptions) ([]Issue, error)
@@ -103,3 +102,4 @@ type VCClient interface {
 	// FinishCommit completes a commit, after which a code change request can be opened or updated.
 	FinishCommit(message string) error
 }
+*/

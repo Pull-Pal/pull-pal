@@ -17,8 +17,6 @@ import (
 	"github.com/mobyvb/pull-pal/llm"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/config"
-	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/google/go-github/github"
@@ -91,62 +89,66 @@ func NewGithubClient(ctx context.Context, log *zap.Logger, self Author, repo Rep
 }
 
 // OpenCodeChangeRequest pushes to a new remote branch and opens a PR on Github.
-func (gc *GithubClient) OpenCodeChangeRequest(req llm.CodeChangeRequest, res llm.CodeChangeResponse) (id, url string, err error) {
+func (gc *GithubClient) OpenCodeChangeRequest(req llm.CodeChangeRequest, res llm.CodeChangeResponse, fromBranch, toBranch string) (id, url string, err error) {
 	// TODO handle gc.ctx canceled
 
 	title := req.Subject
 	if title == "" {
 		title = "update files"
 	}
-	branchName := randomBranchName()
-	branchRefName := plumbing.NewBranchReferenceName(branchName)
-	baseBranch := "main"
-	remoteName := "origin"
+	/*
+		branchName := randomBranchName()
+		branchRefName := plumbing.NewBranchReferenceName(branchName)
+		baseBranch := "main"
+		remoteName := "origin"
+	*/
 	body := res.Notes
 	body += fmt.Sprintf("\n\nResolves #%s", req.IssueID)
 
 	// Create new local branch
-	headRef, err := gc.repo.localRepo.Head()
-	if err != nil {
-		return "", "", err
-	}
-	err = gc.repo.localRepo.CreateBranch(&config.Branch{
-		Name:   branchName,
-		Remote: remoteName,
-		Merge:  branchRefName,
-	})
-	if err != nil {
-		return "", "", err
-	}
+	/*
+		headRef, err := gc.repo.localRepo.Head()
+		if err != nil {
+			return "", "", err
+		}
+		err = gc.repo.localRepo.CreateBranch(&config.Branch{
+			Name:   branchName,
+			Remote: remoteName,
+			Merge:  branchRefName,
+		})
+		if err != nil {
+			return "", "", err
+		}
 
-	// Update the branch to point to the new commit
-	err = gc.repo.localRepo.Storer.SetReference(plumbing.NewHashReference(branchRefName, headRef.Hash()))
-	if err != nil {
-		return "", "", err
-	}
+		// Update the branch to point to the new commit
+		err = gc.repo.localRepo.Storer.SetReference(plumbing.NewHashReference(branchRefName, headRef.Hash()))
+		if err != nil {
+			return "", "", err
+		}
 
-	// Push the new branch to the remote repository
-	remote, err := gc.repo.localRepo.Remote(remoteName)
-	if err != nil {
-		return "", "", err
-	}
+		// Push the new branch to the remote repository
+		remote, err := gc.repo.localRepo.Remote(remoteName)
+		if err != nil {
+			return "", "", err
+		}
 
-	err = remote.Push(&git.PushOptions{
-		RefSpecs: []config.RefSpec{config.RefSpec(fmt.Sprintf("%s:refs/heads/%s", branchRefName, branchName))},
-		Auth: &http.BasicAuth{
-			Username: gc.self.Handle,
-			Password: gc.self.Token,
-		},
-	})
-	if err != nil {
-		return "", "", err
-	}
+		err = remote.Push(&git.PushOptions{
+			RefSpecs: []config.RefSpec{config.RefSpec(fmt.Sprintf("%s:refs/heads/%s", branchRefName, branchName))},
+			Auth: &http.BasicAuth{
+				Username: gc.self.Handle,
+				Password: gc.self.Token,
+			},
+		})
+		if err != nil {
+			return "", "", err
+		}
+	*/
 
 	// Finally, open a pull request from the new branch.
 	pr, _, err := gc.client.PullRequests.Create(gc.ctx, gc.repo.Owner.Handle, gc.repo.Name, &github.NewPullRequest{
 		Title: &title,
-		Head:  &branchName,
-		Base:  &baseBranch,
+		Head:  &fromBranch,
+		Base:  &toBranch,
 		Body:  &body,
 	})
 	if err != nil {
