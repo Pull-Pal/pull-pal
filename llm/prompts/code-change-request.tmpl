@@ -15,10 +15,10 @@ Body:
 Respond in the exact format:
 Files:
 {{ range $index, $file := .Files }}
-  - name: {{ $file.Path }}
-    contents:
+  ppname: {{ $file.Path }}
+    ppcontents:
     [new {{ $file.Path }} contents]
 {{ end }}
 
-Notes:
+ppnotes:
 [additional context about your changes]

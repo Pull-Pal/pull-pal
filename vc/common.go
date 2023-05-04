@@ -80,26 +80,3 @@ func (repo Repository) SSH() string {
 func (repo Repository) HTTPS() string {
 	return fmt.Sprintf("https://%s/%s/%s.git", repo.HostDomain, repo.Owner.Handle, repo.Name)
 }
-
-// VCClient is an interface for version control server's client, e.g. a Github or Gerrit client.
-/*
-type VCClient interface {
-	// ListOpenIssues lists unresolved issues meeting the provided criteria on the version control server.
-	ListOpenIssues(opts ListIssueOptions) ([]Issue, error)
-	// ListOpenComments lists unresolved comments meeting the provided criteria on the version control server.
-	ListOpenComments(opts ListCommentOptions) ([]Comment, error)
-	// OpenCodeChangeRequest opens a new "code change request" on the version control server (e.g. "pull request" in Github).
-	OpenCodeChangeRequest(req llm.CodeChangeRequest, res llm.CodeChangeResponse) (id, url string, err error)
-	// UpdateCodeChangeRequest updates an existing code change request on the version control server.
-	// UpdateCodeChangeRequest(id string, res llm.CodeChangeResponse)
-	// TODO: add/read comments to/from issues and code change requests
-	// GetLocalFile gets the current representation of the file at the provided path from the local git repo.
-	GetLocalFile(path string) (llm.File, error)
-	// StartCommit initiates a commit process, after which files can be modified and added to the commit.
-	StartCommit() error
-	// ReplaceOrAddLocalFile updates or adds a file in the locally cloned repo, and applies these changes to the current git worktree.
-	ReplaceOrAddLocalFile(newFile llm.File) error
-	// FinishCommit completes a commit, after which a code change request can be opened or updated.
-	FinishCommit(message string) error
-}
-*/

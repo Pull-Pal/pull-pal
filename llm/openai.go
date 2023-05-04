@@ -23,10 +23,11 @@ func (oc *OpenAIClient) EvaluateCCR(ctx context.Context, req CodeChangeRequest) 
 	resp, err := oc.client.CreateChatCompletion(
 		ctx,
 		openai.ChatCompletionRequest{
-			Model: openai.GPT3Dot5Turbo,
+			// TODO make model configurable
+			Model: openai.GPT4,
+			//Model: openai.GPT3Dot5Turbo,
 			Messages: []openai.ChatCompletionMessage{
 				{
-					// TODO is this the correct role for my prompts?
 					Role:    openai.ChatMessageRoleUser,
 					Content: req.String(),
 				},
@@ -38,9 +39,9 @@ func (oc *OpenAIClient) EvaluateCCR(ctx context.Context, req CodeChangeRequest) 
 		return res, err
 	}
 
-	// TODO use different choices/different options in different branches/worktrees?
 	choice := resp.Choices[0].Message.Content
 
+	// TODO make debug log when I figure out how to config that
 	oc.log.Info("got response from llm", zap.String("output", choice))
 
 	return ParseCodeChangeResponse(choice), nil

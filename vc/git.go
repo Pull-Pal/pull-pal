@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mobyvb/pull-pal/llm"
+	"go.uber.org/zap"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
@@ -27,7 +28,8 @@ type LocalGitClient struct {
 }
 
 // NewLocalGitClient initializes a local git client by checking out a repository locally.
-func NewLocalGitClient( /*ctx context.Context, log *zap.Logger, */ self Author, repo Repository) (*LocalGitClient, error) {
+func NewLocalGitClient( /*ctx context.Context, */ log *zap.Logger, self Author, repo Repository) (*LocalGitClient, error) {
+	log.Info("checking out local github repo", zap.String("repo name", repo.Name), zap.String("local path", repo.LocalPath))
 	// clone provided repository to local path
 	if repo.LocalPath == "" {
 		return nil, errors.New("local path to clone repository not provided")

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"strconv"
 	"strings"
 	"time"
@@ -12,7 +11,6 @@ import (
 	"github.com/mobyvb/pull-pal/llm"
 	"github.com/mobyvb/pull-pal/vc"
 
-	"github.com/atotto/clipboard"
 	"go.uber.org/zap"
 )
 
@@ -20,10 +18,10 @@ import (
 var IssueNotFound = errors.New("no issue found")
 
 // PullPal is the service responsible for:
-//  * Interacting with git server (e.g. reading issues and making PRs on Github)
-//  * Generating LLM prompts
-//  * Parsing LLM responses
-//  * Interacting with LLM (e.g. with GPT via OpenAI API)
+//   - Interacting with git server (e.g. reading issues and making PRs on Github)
+//   - Generating LLM prompts
+//   - Parsing LLM responses
+//   - Interacting with LLM (e.g. with GPT via OpenAI API)
 type PullPal struct {
 	ctx              context.Context
 	log              *zap.Logger
@@ -40,7 +38,7 @@ func NewPullPal(ctx context.Context, log *zap.Logger, listIssueOptions vc.ListIs
 	if err != nil {
 		return nil, err
 	}
-	localGitClient, err := vc.NewLocalGitClient(self, repo)
+	localGitClient, err := vc.NewLocalGitClient(log, self, repo)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +106,7 @@ func (p *PullPal) Run() error {
 		files := []llm.File{}
 		for _, path := range fileList {
 			path = strings.TrimSpace(path)
-			nextFile, err := p.ghClient.GetLocalFile(path)
+			nextFile, err := p.localGitClient.GetLocalFile(path)
 			if err != nil {
 				p.log.Error("error getting file from vcclient", zap.Error(err))
 				continue
@@ -189,6 +187,8 @@ func (p *PullPal) Run() error {
 	return nil
 }
 
+/*
+
 // PickIssueToFile is the same as PickIssue, but the changeRequest is converted to a string and written to a file.
 func (p *PullPal) PickIssueToFile(promptPath string) (issue vc.Issue, changeRequest llm.CodeChangeRequest, err error) {
 	issue, changeRequest, err = p.PickIssue()
@@ -220,7 +220,8 @@ func (p *PullPal) PickIssueToClipboard() (issue vc.Issue, changeRequest llm.Code
 	err = clipboard.WriteAll(prompt)
 	return issue, changeRequest, err
 }
-
+*/
+/*
 // PickIssue selects an issue from the version control server and returns the selected issue, as well as the LLM prompt needed to fulfill the request.
 func (p *PullPal) PickIssue() (issue vc.Issue, changeRequest llm.CodeChangeRequest, err error) {
 	// TODO I should be able to pass in settings for listing issues from here
@@ -263,7 +264,7 @@ func (p *PullPal) PickIssue() (issue vc.Issue, changeRequest llm.CodeChangeReque
 
 	return issue, changeRequest, nil
 }
-
+*/
 /*
 // ProcessResponseFromFile is the same as ProcessResponse, but the response is inputted into a file rather than passed directly as an argument.
 func (p *PullPal) ProcessResponseFromFile(codeChangeRequest llm.CodeChangeRequest, llmResponsePath string) (url string, err error) {
@@ -303,6 +304,7 @@ func (p *PullPal) ProcessResponse(codeChangeRequest llm.CodeChangeRequest, llmRe
 }
 */
 
+/*
 // ListIssues gets a list of all issues meeting the provided criteria.
 func (p *PullPal) ListIssues(handles, labels []string) ([]vc.Issue, error) {
 	issues, err := p.ghClient.ListOpenIssues(vc.ListIssueOptions{
@@ -368,3 +370,4 @@ func (p *PullPal) MakeLocalChange(issue vc.Issue) error {
 
 	return nil
 }
+*/
