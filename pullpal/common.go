@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"strconv"
 	"strings"
 	"time"
 
@@ -63,17 +64,35 @@ func (p *PullPal) Run() error {
 		issues, err := p.ghClient.ListOpenIssues(p.listIssueOptions)
 		if err != nil {
 			p.log.Error("error listing issues", zap.Error(err))
-			continue
+			return err
 		}
 
 		if len(issues) == 0 {
 			// todo don't sleep
-			p.log.Info("no issues found. sleeping for 5 mins")
-			time.Sleep(5 * time.Minute)
+			p.log.Info("no issues found. sleeping for 30 seconds")
+			time.Sleep(30 * time.Second)
 			continue
 		}
 
 		issue := issues[0]
+		issueNumber, err := strconv.Atoi(issue.ID)
+		if err != nil {
+			p.log.Error("error converting issue ID to int", zap.Error(err))
+			return err
+		}
+
+		err = p.ghClient.CommentOnIssue(issueNumber, "on it")
+		if err != nil {
+			p.log.Error("error commenting on issue", zap.Error(err))
+			return err
+		}
+		for _, label := range p.listIssueOptions.Labels {
+			err = p.ghClient.RemoveLabelFromIssue(issueNumber, label)
+			if err != nil {
+				p.log.Error("error removing labels from issue", zap.Error(err))
+				return err
+			}
+		}
 
 		// remove file list from issue body
 		// TODO do this better and probably somewhere else
@@ -115,38 +134,43 @@ func (p *PullPal) Run() error {
 		//codeChangeResponse := llm.ParseCodeChangeResponse(llmResponse)
 
 		// create commit with file changes
-		newBranchName := fmt.Sprintf("fix-%s", changeRequest.IssueID)
-		err = p.localGitClient.SwitchBranch(newBranchName)
-		if err != nil {
-			p.log.Error("error switching branch", zap.Error(err))
-			continue
-		}
 		err = p.localGitClient.StartCommit()
 		//err = p.ghClient.StartCommit()
 		if err != nil {
 			p.log.Error("error starting commit", zap.Error(err))
-			continue
+			return err
 		}
+		newBranchName := fmt.Sprintf("fix-%s", changeRequest.IssueID)
+		/*
+			err = p.localGitClient.SwitchBranch(newBranchName)
+			if err != nil {
+				p.log.Error("error switching branch", zap.Error(err))
+				return err
+			}
+		*/
 		for _, f := range changeResponse.Files {
+			p.log.Info("replacing or adding file", zap.String("path", f.Path), zap.String("contents", f.Contents))
 			err = p.localGitClient.ReplaceOrAddLocalFile(f)
 			// err = p.ghClient.ReplaceOrAddLocalFile(f)
 			if err != nil {
 				p.log.Error("error replacing or adding file", zap.Error(err))
-				continue
+				return err
 			}
 		}
 
 		commitMessage := changeRequest.Subject + "\n\n" + changeResponse.Notes + "\n\nResolves: #" + changeRequest.IssueID
+		p.log.Info("about to create commit", zap.String("message", commitMessage))
 		err = p.localGitClient.FinishCommit(commitMessage)
 		if err != nil {
-			p.log.Error("error finshing commit", zap.Error(err))
-			continue
+			p.log.Error("error finishing commit", zap.Error(err))
+			// TODO figure out why sometimes finish commit returns "already up-to-date error"
+			// return err
 		}
 
 		err = p.localGitClient.PushBranch(newBranchName)
 		if err != nil {
-			p.log.Error("error finshing commit", zap.Error(err))
-			continue
+			p.log.Error("error pushing branch", zap.Error(err))
+			return err
 		}
 
 		// open code change request
@@ -154,11 +178,12 @@ func (p *PullPal) Run() error {
 		_, url, err := p.ghClient.OpenCodeChangeRequest(changeRequest, changeResponse, newBranchName, "main")
 		if err != nil {
 			p.log.Error("error opening PR", zap.Error(err))
+			return err
 		}
 		p.log.Info("successfully created PR", zap.String("URL", url))
 
-		p.log.Info("going to sleep for five mins")
-		time.Sleep(5 * time.Minute)
+		p.log.Info("going to sleep for thirty seconds")
+		time.Sleep(30 * time.Second)
 	}
 
 	return nil

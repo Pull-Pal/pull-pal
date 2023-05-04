@@ -14,7 +14,6 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
-	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 )
@@ -59,24 +58,44 @@ func NewLocalGitClient( /*ctx context.Context, log *zap.Logger, */ self Author, 
 	}, nil
 }
 
+/*
 func (gc *LocalGitClient) SwitchBranch(branchName string) (err error) {
-	branchRefName := plumbing.NewBranchReferenceName(branchName)
-	remoteName := "origin"
+	if gc.worktree == nil {
+		return errors.New("worktree is nil - cannot check out a branch")
+	}
 
-	err = gc.repo.localRepo.CreateBranch(&config.Branch{
-		Name:   branchName,
-		Remote: remoteName,
-		Merge:  branchRefName,
+	branchRefName := plumbing.NewBranchReferenceName(branchName)
+	// remoteName := "origin"
+
+	err = gc.repo.localRepo.Fetch(&git.FetchOptions{
+		RefSpecs: []config.RefSpec{"refs/*:refs/*", "HEAD:refs/heads/HEAD"},
 	})
 	if err != nil {
 		return err
 	}
 
+	err = gc.worktree.Checkout(&git.CheckoutOptions{
+		Branch: branchRefName,
+		Force:  true,
+	})
+	if err != nil {
+		return err
+	}
+		err = gc.repo.localRepo.CreateBranch(&config.Branch{
+			Name:   branchName,
+			Remote: remoteName,
+			Merge:  branchRefName,
+		})
+		if err != nil {
+			return err
+		}
+
 	return nil
 }
+*/
 
 func (gc *LocalGitClient) PushBranch(branchName string) (err error) {
-	branchRefName := plumbing.NewBranchReferenceName(branchName)
+	//branchRefName := plumbing.NewBranchReferenceName(branchName)
 	remoteName := "origin"
 
 	// Push the new branch to the remote repository
@@ -86,7 +105,9 @@ func (gc *LocalGitClient) PushBranch(branchName string) (err error) {
 	}
 
 	err = remote.Push(&git.PushOptions{
-		RefSpecs: []config.RefSpec{config.RefSpec(fmt.Sprintf("%s:refs/heads/%s", branchRefName, branchName))},
+		RemoteName: remoteName,
+		// TODO remove hardcoded "main"
+		RefSpecs: []config.RefSpec{config.RefSpec(fmt.Sprintf("+refs/heads/%s:refs/heads/%s", "main", branchName))},
 		Auth: &http.BasicAuth{
 			Username: gc.self.Handle,
 			Password: gc.self.Token,
@@ -146,9 +167,13 @@ func (gc *LocalGitClient) ReplaceOrAddLocalFile(newFile llm.File) error {
 	if strings.HasSuffix(newFile.Path, ".go") {
 		newContents, err := format.Source([]byte(newFile.Contents))
 		if err != nil {
-			return err
+			// TODO also make logger accessible
+			fmt.Println("go format error")
+			// TODO handle this error
+			// return err
+		} else {
+			newFile.Contents = string(newContents)
 		}
-		newFile.Contents = string(newContents)
 	}
 
 	fullPath := filepath.Join(gc.repo.LocalPath, newFile.Path)

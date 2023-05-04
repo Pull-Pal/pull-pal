@@ -41,7 +41,7 @@ func (oc *OpenAIClient) EvaluateCCR(ctx context.Context, req CodeChangeRequest) 
 	// TODO use different choices/different options in different branches/worktrees?
 	choice := resp.Choices[0].Message.Content
 
-	oc.log.Debug("got response from llm", zap.String("output", choice))
+	oc.log.Info("got response from llm", zap.String("output", choice))
 
 	return ParseCodeChangeResponse(choice), nil
 }

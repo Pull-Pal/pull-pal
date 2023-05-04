@@ -208,6 +208,39 @@ func (gc *GithubClient) ListOpenIssues(options ListIssueOptions) ([]Issue, error
 	return toReturn, nil
 }
 
+// CommentOnIssue adds a comment to the issue provided.
+func (gc *GithubClient) CommentOnIssue(issueNumber int, comment string) error {
+	ghComment := &github.IssueComment{
+		Body: github.String(comment),
+	}
+
+	_, _, err := gc.client.Issues.CreateComment(gc.ctx, gc.repo.Owner.Handle, gc.repo.Name, issueNumber, ghComment)
+
+	return err
+}
+
+// RemoveLabelFromIssue removes the provided label from an issue if that label is applied.
+func (gc *GithubClient) RemoveLabelFromIssue(issueNumber int, label string) error {
+	hasLabel := false
+	labels, _, err := gc.client.Issues.ListLabelsByIssue(gc.ctx, gc.repo.Owner.Handle, gc.repo.Name, issueNumber, nil)
+	if err != nil {
+		return err
+	}
+	for _, l := range labels {
+		if l.GetName() == label {
+			hasLabel = true
+			break
+		}
+	}
+
+	if hasLabel {
+		_, err = gc.client.Issues.RemoveLabelForIssue(gc.ctx, gc.repo.Owner.Handle, gc.repo.Name, issueNumber, label)
+		return err
+	}
+
+	return nil
+}
+
 // ListOpenComments lists unresolved comments in the Github repository.
 func (gc *GithubClient) ListOpenComments(options ListCommentOptions) ([]Comment, error) {
 	toReturn := []Comment{}

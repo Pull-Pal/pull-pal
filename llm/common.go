@@ -74,8 +74,14 @@ func (res CodeChangeResponse) String() string {
 func ParseCodeChangeResponse(llmResponse string) CodeChangeResponse {
 	sections := strings.Split(llmResponse, "Notes:")
 
-	filesSection := sections[0]
-	notes := strings.TrimSpace(sections[1])
+	filesSection := ""
+	if len(sections) > 0 {
+		filesSection = sections[0]
+	}
+	notes := ""
+	if len(sections) > 1 {
+		notes = strings.TrimSpace(sections[1])
+	}
 
 	files := parseFiles(filesSection)
 
@@ -88,6 +94,9 @@ func ParseCodeChangeResponse(llmResponse string) CodeChangeResponse {
 // parseFiles process the "files" subsection of the LLM's response. It is a helper for GetCodeChangeResponse.
 func parseFiles(filesSection string) []File {
 	fileStringList := strings.Split(filesSection, "name:")
+	if len(fileStringList) < 2 {
+		return []File{}
+	}
 	// first item in the list is just gonna be "Files:"
 	fileStringList = fileStringList[1:]
 
@@ -99,6 +108,9 @@ func parseFiles(filesSection string) []File {
 	fileList := make([]File, len(fileStringList))
 	for i, f := range fileStringList {
 		fileParts := strings.Split(f, "contents:")
+		if len(fileParts) < 2 {
+			continue
+		}
 		path := replacer.Replace(fileParts[0])
 		path = strings.TrimSpace(path)
 
