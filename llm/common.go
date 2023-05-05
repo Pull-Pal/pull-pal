@@ -37,7 +37,7 @@ func (req CodeChangeRequest) MustGetPrompt() string {
 
 // GetPrompt converts the information in the request to a prompt for an LLM.
 func (req CodeChangeRequest) GetPrompt() (string, error) {
-	tmpl, err := template.ParseFiles("./llm/code-change-request.tmpl")
+	tmpl, err := template.ParseFiles("./llm/prompts/code-change-request.tmpl")
 	if err != nil {
 		return "", err
 	}
@@ -72,10 +72,16 @@ func (res CodeChangeResponse) String() string {
 
 // ParseCodeChangeResponse parses the LLM's response to CodeChangeRequest (string) into a CodeChangeResponse.
 func ParseCodeChangeResponse(llmResponse string) CodeChangeResponse {
-	sections := strings.Split(llmResponse, "Notes:")
+	sections := strings.Split(llmResponse, "ppnotes:")
 
-	filesSection := sections[0]
-	notes := strings.TrimSpace(sections[1])
+	filesSection := ""
+	if len(sections) > 0 {
+		filesSection = sections[0]
+	}
+	notes := ""
+	if len(sections) > 1 {
+		notes = strings.TrimSpace(sections[1])
+	}
 
 	files := parseFiles(filesSection)
 
@@ -87,7 +93,10 @@ func ParseCodeChangeResponse(llmResponse string) CodeChangeResponse {
 
 // parseFiles process the "files" subsection of the LLM's response. It is a helper for GetCodeChangeResponse.
 func parseFiles(filesSection string) []File {
-	fileStringList := strings.Split(filesSection, "name:")
+	fileStringList := strings.Split(filesSection, "ppname:")
+	if len(fileStringList) < 2 {
+		return []File{}
+	}
 	// first item in the list is just gonna be "Files:"
 	fileStringList = fileStringList[1:]
 
@@ -98,7 +107,10 @@ func parseFiles(filesSection string) []File {
 	)
 	fileList := make([]File, len(fileStringList))
 	for i, f := range fileStringList {
-		fileParts := strings.Split(f, "contents:")
+		fileParts := strings.Split(f, "ppcontents:")
+		if len(fileParts) < 2 {
+			continue
+		}
 		path := replacer.Replace(fileParts[0])
 		path = strings.TrimSpace(path)
 

@@ -6,9 +6,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var runCmd = &cobra.Command{
-	Use:   "run",
-	Short: "Runs a fully automated pull pal service",
+var debugGitCmd = &cobra.Command{
+	Use:   "debug-git",
+	Short: "debug git functionality",
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := getConfig()
 
@@ -19,14 +19,14 @@ var runCmd = &cobra.Command{
 		}
 		fmt.Println("Successfully initialized pull pal")
 
-		err = p.Run()
+		err = p.DebugGit()
 		if err != nil {
-			fmt.Println("error running", err)
+			fmt.Println("err debugging git", err)
 			return
 		}
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(debugGitCmd)
 }
