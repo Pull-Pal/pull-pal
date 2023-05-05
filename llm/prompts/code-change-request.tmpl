@@ -15,9 +15,9 @@ Body:
 Respond in the exact format:
 Files:
 {{ range $index, $file := .Files }}
-  ppname: {{ $file.Path }}
-    ppcontents:
-    [new {{ $file.Path }} contents]
+ppname: {{ $file.Path }}
+ppcontents:
+[new {{ $file.Path }} contents]
 {{ end }}
 
 ppnotes:

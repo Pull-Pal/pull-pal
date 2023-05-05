@@ -7,6 +7,7 @@ import (
 
 	"github.com/mobyvb/pull-pal/pullpal"
 	"github.com/mobyvb/pull-pal/vc"
+	"github.com/sashabaranov/go-openai"
 	"go.uber.org/zap"
 
 	"github.com/spf13/cobra"
@@ -79,7 +80,8 @@ func getPullPal(ctx context.Context, cfg config) (*pullpal.PullPal, error) {
 		Handles: cfg.usersToListenTo,
 		Labels:  cfg.requiredIssueLabels,
 	}
-	p, err := pullpal.NewPullPal(ctx, log.Named("pullpal"), listIssueOptions, author, repo, cfg.openAIToken)
+	// TODO make model configurable
+	p, err := pullpal.NewPullPal(ctx, log.Named("pullpal"), listIssueOptions, author, repo, openai.GPT4, cfg.openAIToken)
 
 	return p, err
 }

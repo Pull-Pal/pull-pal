@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 )
@@ -60,41 +61,24 @@ func NewLocalGitClient( /*ctx context.Context, */ log *zap.Logger, self Author, 
 	}, nil
 }
 
-/*
-func (gc *LocalGitClient) SwitchBranch(branchName string) (err error) {
+func (gc *LocalGitClient) CheckoutRemoteBranch(branchName string) (err error) {
 	if gc.worktree == nil {
 		return errors.New("worktree is nil - cannot check out a branch")
 	}
 
-	branchRefName := plumbing.NewBranchReferenceName(branchName)
-	// remoteName := "origin"
-
-	err = gc.repo.localRepo.Fetch(&git.FetchOptions{
-		RefSpecs: []config.RefSpec{"refs/*:refs/*", "HEAD:refs/heads/HEAD"},
-	})
-	if err != nil {
-		return err
-	}
-
-	err = gc.worktree.Checkout(&git.CheckoutOptions{
-		Branch: branchRefName,
+	// TODO configurable remote
+	branchRefName := plumbing.NewRemoteReferenceName("origin", branchName)
+	branchCoOpts := git.CheckoutOptions{
+		Branch: plumbing.ReferenceName(branchRefName),
 		Force:  true,
-	})
+	}
+	err = gc.worktree.Checkout(&branchCoOpts)
 	if err != nil {
 		return err
 	}
-		err = gc.repo.localRepo.CreateBranch(&config.Branch{
-			Name:   branchName,
-			Remote: remoteName,
-			Merge:  branchRefName,
-		})
-		if err != nil {
-			return err
-		}
 
 	return nil
 }
-*/
 
 func (gc *LocalGitClient) PushBranch(branchName string) (err error) {
 	//branchRefName := plumbing.NewBranchReferenceName(branchName)

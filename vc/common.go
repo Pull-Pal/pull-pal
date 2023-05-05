@@ -32,24 +32,25 @@ type ListIssueOptions struct {
 // Comment represents a comment on a code change request.
 // TODO comments on issue?
 type Comment struct {
-	ID string
+	ID int64
 	// ChangeID is the local identifier for the code change request this comment was left on (e.g. Github PR number)
 	ChangeID string
 	Author   Author
 	Body     string
 	Position int
+	FilePath string
 	DiffHunk string
 	URL      string
+	Branch   string
+	PRNumber int
 }
 
 func (c Comment) String() string {
-	return fmt.Sprintf("Comment ID: %s\nAuthor: %s\nBody: %s\nPosition: %d\n\nDiffHunk:\n%s\n\nURL: %s\n", c.ID, c.Author.Handle, c.Body, c.Position, c.DiffHunk, c.URL)
+	return fmt.Sprintf("Comment ID: %d\nAuthor: %s\nBody: %s\nPosition: %d\n\nDiffHunk:\n%s\n\nURL: %s\nBranch:\n%s\n\nFilePath:\n%s\n\n", c.ID, c.Author.Handle, c.Body, c.Position, c.DiffHunk, c.URL, c.Branch, c.FilePath)
 }
 
 // ListCommentOptions defines options for listing comments.
 type ListCommentOptions struct {
-	// ChangeID is the local identifier for the code change request to list comments from (e.g. Github PR number)
-	ChangeID string
 	// Handles defines the list of usernames to list comments from
 	// The comment can be created by *any* user provided.
 	Handles []string

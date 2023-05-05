@@ -33,7 +33,7 @@ type PullPal struct {
 }
 
 // NewPullPal creates a new "pull pal service", including setting up local version control and LLM integrations.
-func NewPullPal(ctx context.Context, log *zap.Logger, listIssueOptions vc.ListIssueOptions, self vc.Author, repo vc.Repository, openAIToken string) (*PullPal, error) {
+func NewPullPal(ctx context.Context, log *zap.Logger, listIssueOptions vc.ListIssueOptions, self vc.Author, repo vc.Repository, model string, openAIToken string) (*PullPal, error) {
 	ghClient, err := vc.NewGithubClient(ctx, log, self, repo)
 	if err != nil {
 		return nil, err
@@ -50,7 +50,7 @@ func NewPullPal(ctx context.Context, log *zap.Logger, listIssueOptions vc.ListIs
 
 		ghClient:       ghClient,
 		localGitClient: localGitClient,
-		openAIClient:   llm.NewOpenAIClient(log.Named("openaiClient"), openAIToken),
+		openAIClient:   llm.NewOpenAIClient(log.Named("openaiClient"), model, openAIToken),
 	}, nil
 }
 
@@ -59,6 +59,7 @@ func (p *PullPal) Run() error {
 	p.log.Info("Starting Pull Pal")
 	// TODO gracefully handle context cancelation
 	for {
+		p.log.Info("checking github issues...")
 		issues, err := p.ghClient.ListOpenIssues(p.listIssueOptions)
 		if err != nil {
 			p.log.Error("error listing issues", zap.Error(err))
@@ -66,178 +67,66 @@ func (p *PullPal) Run() error {
 		}
 
 		if len(issues) == 0 {
-			// todo don't sleep
-			p.log.Info("no issues found. sleeping for 30 seconds")
-			time.Sleep(30 * time.Second)
-			continue
-		}
+			p.log.Info("no issues found")
+		} else {
+			p.log.Info("picked issue to process")
 
-		issue := issues[0]
-		issueNumber, err := strconv.Atoi(issue.ID)
-		if err != nil {
-			p.log.Error("error converting issue ID to int", zap.Error(err))
-			return err
-		}
-
-		err = p.ghClient.CommentOnIssue(issueNumber, "on it")
-		if err != nil {
-			p.log.Error("error commenting on issue", zap.Error(err))
-			return err
-		}
-		for _, label := range p.listIssueOptions.Labels {
-			err = p.ghClient.RemoveLabelFromIssue(issueNumber, label)
+			issue := issues[0]
+			err = p.handleIssue(issue)
 			if err != nil {
-				p.log.Error("error removing labels from issue", zap.Error(err))
-				return err
+				p.log.Error("error handling issue", zap.Error(err))
 			}
 		}
 
-		// remove file list from issue body
-		// TODO do this better and probably somewhere else
-		parts := strings.Split(issue.Body, "Files:")
-		issue.Body = parts[0]
-
-		fileList := []string{}
-		if len(parts) > 1 {
-			fileList = strings.Split(parts[1], ",")
-		}
-
-		// get file contents from local git repository
-		files := []llm.File{}
-		for _, path := range fileList {
-			path = strings.TrimSpace(path)
-			nextFile, err := p.localGitClient.GetLocalFile(path)
-			if err != nil {
-				p.log.Error("error getting file from vcclient", zap.Error(err))
-				continue
-			}
-			files = append(files, nextFile)
-		}
-
-		changeRequest := llm.CodeChangeRequest{
-			Subject: issue.Subject,
-			Body:    issue.Body,
-			IssueID: issue.ID,
-			Files:   files,
-		}
-
-		changeResponse, err := p.openAIClient.EvaluateCCR(p.ctx, changeRequest)
+		p.log.Info("checking pr comments...")
+		comments, err := p.ghClient.ListOpenComments(vc.ListCommentOptions{
+			Handles: p.listIssueOptions.Handles,
+		})
 		if err != nil {
-			p.log.Error("error getting response from openai", zap.Error(err))
-			continue
-
-		}
-
-		// parse llm response
-		//codeChangeResponse := llm.ParseCodeChangeResponse(llmResponse)
-
-		// create commit with file changes
-		err = p.localGitClient.StartCommit()
-		//err = p.ghClient.StartCommit()
-		if err != nil {
-			p.log.Error("error starting commit", zap.Error(err))
-			return err
-		}
-		newBranchName := fmt.Sprintf("fix-%s", changeRequest.IssueID)
-		/*
-			err = p.localGitClient.SwitchBranch(newBranchName)
-			if err != nil {
-				p.log.Error("error switching branch", zap.Error(err))
-				return err
-			}
-		*/
-		for _, f := range changeResponse.Files {
-			p.log.Info("replacing or adding file", zap.String("path", f.Path), zap.String("contents", f.Contents))
-			err = p.localGitClient.ReplaceOrAddLocalFile(f)
-			// err = p.ghClient.ReplaceOrAddLocalFile(f)
-			if err != nil {
-				p.log.Error("error replacing or adding file", zap.Error(err))
-				return err
-			}
-		}
-
-		commitMessage := changeRequest.Subject + "\n\n" + changeResponse.Notes + "\n\nResolves: #" + changeRequest.IssueID
-		p.log.Info("about to create commit", zap.String("message", commitMessage))
-		err = p.localGitClient.FinishCommit(commitMessage)
-		if err != nil {
-			p.log.Error("error finishing commit", zap.Error(err))
-			// TODO figure out why sometimes finish commit returns "already up-to-date error"
-			// return err
-		}
-
-		err = p.localGitClient.PushBranch(newBranchName)
-		if err != nil {
-			p.log.Error("error pushing branch", zap.Error(err))
+			p.log.Error("error listing comments", zap.Error(err))
 			return err
 		}
 
-		// open code change request
-		// TODO don't hardcode main branch, make configurable
-		_, url, err := p.ghClient.OpenCodeChangeRequest(changeRequest, changeResponse, newBranchName, "main")
-		if err != nil {
-			p.log.Error("error opening PR", zap.Error(err))
-			return err
-		}
-		p.log.Info("successfully created PR", zap.String("URL", url))
+		if len(comments) == 0 {
+			p.log.Info("no comments found")
+		} else {
+			p.log.Info("picked comment to process")
 
-		p.log.Info("going to sleep for thirty seconds")
+			comment := comments[0]
+			err = p.handleComment(comment)
+			if err != nil {
+				p.log.Error("error handling comment", zap.Error(err))
+			}
+		}
+
+		// TODO remove sleep
+		p.log.Info("sleeping 30s")
 		time.Sleep(30 * time.Second)
 	}
-
-	return nil
 }
 
-/*
-
-// PickIssueToFile is the same as PickIssue, but the changeRequest is converted to a string and written to a file.
-func (p *PullPal) PickIssueToFile(promptPath string) (issue vc.Issue, changeRequest llm.CodeChangeRequest, err error) {
-	issue, changeRequest, err = p.PickIssue()
+func (p *PullPal) handleIssue(issue vc.Issue) error {
+	issueNumber, err := strconv.Atoi(issue.ID)
 	if err != nil {
-		return issue, changeRequest, err
+		p.log.Error("error converting issue ID to int", zap.Error(err))
+		return err
 	}
 
-	prompt, err := changeRequest.GetPrompt()
+	err = p.ghClient.CommentOnIssue(issueNumber, "on it")
 	if err != nil {
-		return issue, changeRequest, err
+		p.log.Error("error commenting on issue", zap.Error(err))
+		return err
 	}
-
-	err = ioutil.WriteFile(promptPath, []byte(prompt), 0644)
-	return issue, changeRequest, err
-}
-
-// PickIssueToClipboard is the same as PickIssue, but the changeRequest is converted to a string and copied to the clipboard.
-func (p *PullPal) PickIssueToClipboard() (issue vc.Issue, changeRequest llm.CodeChangeRequest, err error) {
-	issue, changeRequest, err = p.PickIssue()
-	if err != nil {
-		return issue, changeRequest, err
+	for _, label := range p.listIssueOptions.Labels {
+		err = p.ghClient.RemoveLabelFromIssue(issueNumber, label)
+		if err != nil {
+			p.log.Error("error removing labels from issue", zap.Error(err))
+			return err
+		}
 	}
-
-	prompt, err := changeRequest.GetPrompt()
-	if err != nil {
-		return issue, changeRequest, err
-	}
-
-	err = clipboard.WriteAll(prompt)
-	return issue, changeRequest, err
-}
-*/
-/*
-// PickIssue selects an issue from the version control server and returns the selected issue, as well as the LLM prompt needed to fulfill the request.
-func (p *PullPal) PickIssue() (issue vc.Issue, changeRequest llm.CodeChangeRequest, err error) {
-	// TODO I should be able to pass in settings for listing issues from here
-	issues, err := p.ghClient.ListOpenIssues(p.listIssueOptions)
-	if err != nil {
-		return issue, changeRequest, err
-	}
-
-	if len(issues) == 0 {
-		return issue, changeRequest, IssueNotFound
-	}
-
-	issue = issues[0]
 
 	// remove file list from issue body
-	// TODO do this better
+	// TODO do this better and probably somewhere else
 	parts := strings.Split(issue.Body, "Files:")
 	issue.Body = parts[0]
 
@@ -250,103 +139,7 @@ func (p *PullPal) PickIssue() (issue vc.Issue, changeRequest llm.CodeChangeReque
 	files := []llm.File{}
 	for _, path := range fileList {
 		path = strings.TrimSpace(path)
-		nextFile, err := p.ghClient.GetLocalFile(path)
-		if err != nil {
-			return issue, changeRequest, err
-		}
-		files = append(files, nextFile)
-	}
-
-	changeRequest.Subject = issue.Subject
-	changeRequest.Body = issue.Body
-	changeRequest.IssueID = issue.ID
-	changeRequest.Files = files
-
-	return issue, changeRequest, nil
-}
-*/
-/*
-// ProcessResponseFromFile is the same as ProcessResponse, but the response is inputted into a file rather than passed directly as an argument.
-func (p *PullPal) ProcessResponseFromFile(codeChangeRequest llm.CodeChangeRequest, llmResponsePath string) (url string, err error) {
-	data, err := ioutil.ReadFile(llmResponsePath)
-	if err != nil {
-		return "", err
-	}
-	return p.ProcessResponse(codeChangeRequest, string(data))
-}
-
-// ProcessResponse parses the llm response, updates files in the local git repo accordingly, and opens a new code change request (e.g. Github PR).
-func (p *PullPal) ProcessResponse(codeChangeRequest llm.CodeChangeRequest, llmResponse string) (url string, err error) {
-	// 1. parse llm response
-	codeChangeResponse := llm.ParseCodeChangeResponse(llmResponse)
-
-	// 2. create commit with file changes
-	err = p.ghClient.StartCommit()
-	if err != nil {
-		return "", err
-	}
-	for _, f := range codeChangeResponse.Files {
-		err = p.ghClient.ReplaceOrAddLocalFile(f)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	commitMessage := codeChangeRequest.Subject + "\n\n" + codeChangeResponse.Notes + "\n\nResolves: #" + codeChangeRequest.IssueID
-	err = p.ghClient.FinishCommit(commitMessage)
-	if err != nil {
-		return "", err
-	}
-
-	// 3. open code change request
-	_, url, err = p.ghClient.OpenCodeChangeRequest(codeChangeRequest, codeChangeResponse)
-	return url, err
-}
-*/
-
-/*
-// ListIssues gets a list of all issues meeting the provided criteria.
-func (p *PullPal) ListIssues(handles, labels []string) ([]vc.Issue, error) {
-	issues, err := p.ghClient.ListOpenIssues(vc.ListIssueOptions{
-		Handles: handles,
-		Labels:  labels,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return issues, nil
-}
-
-// ListComments gets a list of all comments meeting the provided criteria on a PR.
-func (p *PullPal) ListComments(changeID string, handles []string) ([]vc.Comment, error) {
-	comments, err := p.ghClient.ListOpenComments(vc.ListCommentOptions{
-		ChangeID: changeID,
-		Handles:  handles,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return comments, nil
-}
-
-func (p *PullPal) MakeLocalChange(issue vc.Issue) error {
-	// remove file list from issue body
-	// TODO do this better
-	parts := strings.Split(issue.Body, "Files:")
-	issue.Body = parts[0]
-
-	fileList := []string{}
-	if len(parts) > 1 {
-		fileList = strings.Split(parts[1], ",")
-	}
-
-	// get file contents from local git repository
-	files := []llm.File{}
-	for _, path := range fileList {
-		path = strings.TrimSpace(path)
-		nextFile, err := p.ghClient.GetLocalFile(path)
+		nextFile, err := p.localGitClient.GetLocalFile(path)
 		if err != nil {
 			return err
 		}
@@ -360,14 +153,114 @@ func (p *PullPal) MakeLocalChange(issue vc.Issue) error {
 		Files:   files,
 	}
 
-	res, err := p.openAIClient.EvaluateCCR(p.ctx, changeRequest)
+	changeResponse, err := p.openAIClient.EvaluateCCR(p.ctx, "", changeRequest)
+	if err != nil {
+		return err
+
+	}
+
+	// create commit with file changes
+	err = p.localGitClient.StartCommit()
+	if err != nil {
+		return err
+	}
+	// todo remove hardcoded main
+	err = p.localGitClient.CheckoutRemoteBranch("main")
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("response from openai")
-	fmt.Println(res)
+	newBranchName := fmt.Sprintf("fix-%s", changeRequest.IssueID)
+	for _, f := range changeResponse.Files {
+		p.log.Info("replacing or adding file", zap.String("path", f.Path), zap.String("contents", f.Contents))
+		err = p.localGitClient.ReplaceOrAddLocalFile(f)
+		if err != nil {
+			return err
+		}
+	}
+
+	commitMessage := changeRequest.Subject + "\n\n" + changeResponse.Notes + "\n\nResolves: #" + changeRequest.IssueID
+	p.log.Info("about to create commit", zap.String("message", commitMessage))
+	err = p.localGitClient.FinishCommit(commitMessage)
+	if err != nil {
+		return err
+	}
+
+	err = p.localGitClient.PushBranch(newBranchName)
+	if err != nil {
+		return err
+	}
+
+	// open code change request
+	// TODO don't hardcode main branch, make configurable
+	_, url, err := p.ghClient.OpenCodeChangeRequest(changeRequest, changeResponse, newBranchName, "main")
+	if err != nil {
+		return err
+	}
+	p.log.Info("successfully created PR", zap.String("URL", url))
 
 	return nil
 }
-*/
+
+func (p *PullPal) handleComment(comment vc.Comment) error {
+	if comment.Branch == "" {
+		return errors.New("no branch provided in comment")
+	}
+
+	file, err := p.localGitClient.GetLocalFile(comment.FilePath)
+	if err != nil {
+		return err
+	}
+
+	diffCommentRequest := llm.DiffCommentRequest{
+		File:     file,
+		Contents: comment.Body,
+		Diff:     comment.DiffHunk,
+	}
+	p.log.Info("diff comment request", zap.String("req", diffCommentRequest.String()))
+
+	diffCommentResponse, err := p.openAIClient.EvaluateDiffComment(p.ctx, "", diffCommentRequest)
+	if err != nil {
+		return err
+	}
+
+	if diffCommentResponse.Type == llm.ResponseCodeChange {
+		p.log.Info("about to start commit")
+		err = p.localGitClient.StartCommit()
+		if err != nil {
+			return err
+		}
+		p.log.Info("checking out branch", zap.String("name", comment.Branch))
+		err = p.localGitClient.CheckoutRemoteBranch(comment.Branch)
+		if err != nil {
+			return err
+		}
+		p.log.Info("replacing or adding file", zap.String("path", diffCommentResponse.File.Path), zap.String("contents", diffCommentResponse.File.Contents))
+		err = p.localGitClient.ReplaceOrAddLocalFile(diffCommentResponse.File)
+		if err != nil {
+			return err
+		}
+
+		commitMessage := "update based on comment"
+		p.log.Info("about to create commit", zap.String("message", commitMessage))
+		err = p.localGitClient.FinishCommit(commitMessage)
+		if err != nil {
+			return err
+		}
+
+		err = p.localGitClient.PushBranch(comment.Branch)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = p.ghClient.RespondToComment(comment.PRNumber, comment.ID, diffCommentResponse.Answer)
+	if err != nil {
+		p.log.Error("error commenting on issue", zap.Error(err))
+		return err
+	}
+
+	p.log.Info("responded addressed comment")
+
+	return nil
+}

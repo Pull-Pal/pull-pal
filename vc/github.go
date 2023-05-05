@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/mobyvb/pull-pal/llm"
 
@@ -152,44 +153,69 @@ func (gc *GithubClient) RemoveLabelFromIssue(issueNumber int, label string) erro
 // ListOpenComments lists unresolved comments in the Github repository.
 func (gc *GithubClient) ListOpenComments(options ListCommentOptions) ([]Comment, error) {
 	toReturn := []Comment{}
-	prNumber, err := strconv.Atoi(options.ChangeID)
-	if err != nil {
-		return nil, err
-	}
-	comments, _, err := gc.client.PullRequests.ListComments(gc.ctx, gc.repo.Owner.Handle, gc.repo.Name, prNumber, nil)
-	if err != nil {
-		return nil, err
-	}
 
-	// TODO: filter out comments that "self" has already replied to
-	// TODO: ignore resolved comments
-	for _, c := range comments {
-		commentUser := c.GetUser().GetLogin()
-		allowedUser := false
-		for _, u := range options.Handles {
-			if commentUser == u {
-				allowedUser = true
-				break
-			}
-		}
-		if !allowedUser {
+	prs, _, err := gc.client.PullRequests.List(gc.ctx, gc.repo.Owner.Handle, gc.repo.Name, nil)
+	if err != nil {
+		return nil, err
+	}
+	for _, pr := range prs {
+		if pr.GetUser().GetLogin() != gc.self.Handle {
 			continue
 		}
 
-		nextComment := Comment{
-			ID:       strconv.FormatInt(c.GetID(), 10),
-			ChangeID: options.ChangeID,
-			URL:      c.GetHTMLURL(),
-			Author: Author{
-				Email:  c.GetUser().GetEmail(),
-				Handle: c.GetUser().GetLogin(),
-			},
-			Body:     c.GetBody(),
-			Position: c.GetPosition(),
-			DiffHunk: c.GetDiffHunk(),
+		branch := ""
+		if pr.Head != nil {
+			branch = pr.Head.GetLabel()
+			if strings.Contains(branch, ":") {
+				branch = strings.Split(branch, ":")[1]
+			}
 		}
-		toReturn = append(toReturn, nextComment)
+
+		comments, _, err := gc.client.PullRequests.ListComments(gc.ctx, gc.repo.Owner.Handle, gc.repo.Name, pr.GetNumber(), nil)
+		if err != nil {
+			return nil, err
+		}
+
+		// TODO: filter out comments that "self" has already replied to
+		// TODO: ignore resolved comments
+		for _, c := range comments {
+			commentUser := c.GetUser().GetLogin()
+			allowedUser := false
+			for _, u := range options.Handles {
+				if commentUser == u {
+					allowedUser = true
+					break
+				}
+			}
+			if !allowedUser {
+				continue
+			}
+
+			nextComment := Comment{
+				ID:       c.GetID(),
+				ChangeID: strconv.Itoa(pr.GetNumber()),
+				URL:      c.GetHTMLURL(),
+				Author: Author{
+					Email:  c.GetUser().GetEmail(),
+					Handle: c.GetUser().GetLogin(),
+				},
+				Body:     c.GetBody(),
+				FilePath: c.GetPath(),
+				Position: c.GetPosition(),
+				DiffHunk: c.GetDiffHunk(),
+				Branch:   branch,
+				PRNumber: pr.GetNumber(),
+			}
+			toReturn = append(toReturn, nextComment)
+		}
 	}
 
 	return toReturn, nil
+}
+
+// RespondToComment adds a comment to the provided thread.
+func (gc *GithubClient) RespondToComment(prNumber int, commentID int64, comment string) error {
+	_, _, err := gc.client.PullRequests.CreateCommentInReplyTo(gc.ctx, gc.repo.Owner.Handle, gc.repo.Name, prNumber, comment, commentID)
+
+	return err
 }
