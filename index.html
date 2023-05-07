@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Assistant Animation</title>
+    <link href="https://fonts.googleapis.com/css?family=Roboto:wght@700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            /*background-color: #f6f8fa;*/
+            background-color: #9ed5c0;
+        }
+
+        h1, h2 {
+            font-family: 'Roboto', sans-serif;
+            font-weight: 700;
+            border-bottom: 3px solid #9ed5c0;
+            margin-bottom: 0;
+        }
+
+        .container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            gap: 16px;
+            border-radius: 6px;
+            width: 800px;
+            margin: auto;
+            margin-top: 24px;
+            border: 1px solid #e4e8eb;
+            /*
+            background-color: #f9fbfc;
+            */
+            background-color: #f6f8fa;
+            overflow: visible;
+
+        }
+
+        .overflowcontainer {
+            width: 650px;
+            overflow-y: hidden;
+        }
+        .cardcontainer {
+            width: 600px;
+            position: relative;
+            height: 600px;
+            margin: auto;
+        }
+
+        .card {
+            box-shadow: -2px 4px 8px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            background-color: #fff;
+            padding: 16px;
+            width: 100%;
+            opacity: 0;
+            transform: translateY(100%);
+            transition: opacity 0.5s ease, transform 1s ease;
+            opacity: 0;
+            box-sizing: border-box;
+            position: absolute;
+        }
+
+        .card.show {
+            opacity: 1;
+            transform: translateY(0);
+            /* display: block; */
+        }
+
+        .issue-title {
+            font-weight: bold;
+            color: #24292e;
+        }
+
+        .issue-description {
+            margin-top: 12px;
+            color: #586069;
+        }
+
+        .comment {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #e1e4e8;
+        }
+
+        .comment-author {
+            font-weight: bold;
+            color: #0366d6;
+        }
+
+        .diff {
+            overflow-x: scroll;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 12px;
+            background-color: #f6f8fa;
+            padding: 12px;
+            margin-top: 12px;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+        }
+
+        .diff .removed {
+            color: #cb2431;
+            white-space: pre;
+        }
+
+        .diff .added {
+            color: #22863a;
+            white-space: pre;
+        }
+
+        button {
+            background-color: #0366d6;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            padding: 8px 16px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            background-color: #9cb2ce;
+            cursor: not-allowed;
+        }
+
+        .info {
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Pull Pal</h1>
+        <div class="info">
+        <p>
+A digital assistant that writes code and collaborates with humans on git repositories.
+        </p>
+        <p>For instructions on how to run and contribute, visit the <a href="https://github.com/mobyvb/pull-pal">Github repository</a>.</p>
+        </div>
+        <div class="overflowcontainer">
+        <div class="cardcontainer">
+        <div class="card issue show">
+            <div class="comment-author">mobyvb</div>
+            <div class="issue-title">Update files <span style="color:lightgrey">#5</span></div>
+            <div class="issue-description">Remove the /api/string endpoint. Add an endpoint to main.go at /api/number to return a random number between 20 and 50<br>
+                Make the content section in index.html a different color from the background<br>
+                Copy the information from the readme to index.html
+                <br><br>
+Files: README.md,index.html,main.go</div>
+        </div>
+        <div class="card comment">
+            <div class="comment-author">beep-boop</div>
+            <div>Working on it...</div>
+        </div>
+        <div class="card">
+            <div class="issue-title">Update files <span style="color:lightgrey">#6</span></div>
+            <div class="issue-description">Remove the /api/string endpoint. Add an endpoint to main.go at /api/number to return a random number between 20 and 50<br>
+                Make the content section in index.html a different color from the background<br>
+                Copy the information from the readme to index.html
+                <br><br>Resolves #5
+                </div>
+                <div class= "diff">
+            <div class="removed">- http.HandleFunc("/api/strings", func(w http.ResponseWriter, r *http.Request) {</div>
+            <div class="removed">-     toReturn := "asdf"</div>
+            <div class="removed">-     fmt.Fprint(w, toReturn)</div>
+            <div class="removed">- })</div>
+            <div class="added">+ http.HandleFunc("/api/number", func(w http.ResponseWriter, r *http.Request) {</div>
+            <div class="added">+     randomNumber := rand.Intn(31) + 20</div>
+            <div class="added">+     fmt.Fprint(w, strconv.Itoa(randomNumber))</div>
+            <div class="added">+ })</div>
+            <div class="removed">- Existing code line 2</div>
+            <div class="added">+ New code line 2</div>
+            <div class="removed">- Existing code line 1</div>
+            <div class="added">+ New code line 1</div>
+            <div class="removed">- Existing code line 2</div>
+            <div class="added">+ New code line 2</div>
+            <div class="removed">- Existing code line 1</div>
+            <div class="added">+ New code line 1</div>
+            <div class="removed">- Existing code line 2</div>
+            <div class="added">+ New code line 2</div>
+                </div>
+        </div>
+        </div>
+        </div>
+        <div>
+            <button id="pauseBtn" >Play/Pause</button>
+            <button id="nextBtn" >Next Step</button>
+        </div>
+    </div>
+    <script>
+        let currentIndex = 0;
+const cards = document.querySelectorAll('.card');
+const prevBtn = document.getElementById('prevBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const nextBtn = document.getElementById('nextBtn');
+        console.log("asdf");
+        console.log(currentIndex)
+        let justStarted = true;
+        let pause = false;
+
+function updateCards() {
+            if (justStarted) {
+                        justStarted = false;
+                        return;
+                    }
+            currentIndex += 1;
+            if (currentIndex >= cards.length) {
+                        currentIndex = 0;
+                    }
+    cards.forEach((card, index) => {
+        if (index === currentIndex) {
+            card.classList.add('show');
+        } else {
+            card.classList.remove('show');
+        }
+    });
+    // prevBtn.disabled = currentIndex === 0;
+    // nextBtn.disabled = currentIndex === cards.length - 1;
+}
+        setInterval(function() {
+                    if (pause) {
+                                return;
+                            }
+                    updateCards()
+                }, 2000)
+
+pauseBtn.addEventListener('click', () => {
+    pause = !pause;
+});
+
+nextBtn.addEventListener('click', () => {
+    updateCards();
+});
+        /*
+prevBtn.addEventListener('click', () => {
+    currentIndex -= 1;
+    updateCards();
+});
+
+nextBtn.addEventListener('click', () => {
+    currentIndex += 1;
+    updateCards();
+});
+       */
+
+updateCards();
+    </script>
+</body>
+</html>
