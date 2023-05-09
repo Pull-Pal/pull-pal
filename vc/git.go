@@ -77,12 +77,36 @@ func (gc *LocalGitClient) CheckoutRemoteBranch(branchName string) (err error) {
 		return err
 	}
 
+	// Pull the latest changes from the remote branch
+	err = gc.worktree.Pull(&git.PullOptions{
+		RemoteName: "origin",
+		Auth: &http.BasicAuth{
+			Username: gc.self.Handle,
+			Password: gc.self.Token,
+		},
+	})
+	if err != nil && err != git.NoErrAlreadyUpToDate {
+		return err
+	}
+
 	return nil
 }
 
 func (gc *LocalGitClient) PushBranch(branchName string) (err error) {
 	//branchRefName := plumbing.NewBranchReferenceName(branchName)
 	remoteName := "origin"
+
+	headRef, err := gc.repo.localRepo.Head()
+	if err != nil {
+		return err
+	}
+
+	// Create new branch at current HEAD
+	branchRef := plumbing.NewHashReference(plumbing.NewBranchReferenceName(branchName), headRef.Hash())
+	err = gc.repo.localRepo.Storer.SetReference(branchRef)
+	if err != nil {
+		return err
+	}
 
 	// Push the new branch to the remote repository
 	remote, err := gc.repo.localRepo.Remote(remoteName)
@@ -93,7 +117,7 @@ func (gc *LocalGitClient) PushBranch(branchName string) (err error) {
 	err = remote.Push(&git.PushOptions{
 		RemoteName: remoteName,
 		// TODO remove hardcoded "main"
-		RefSpecs: []config.RefSpec{config.RefSpec(fmt.Sprintf("+refs/heads/%s:refs/heads/%s", "main", branchName))},
+		RefSpecs: []config.RefSpec{config.RefSpec(fmt.Sprintf("+refs/heads/%s:refs/heads/%s", branchName, branchName))},
 		Auth: &http.BasicAuth{
 			Username: gc.self.Handle,
 			Password: gc.self.Token,

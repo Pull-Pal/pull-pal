@@ -152,12 +152,14 @@ func (gc *GithubClient) RemoveLabelFromIssue(issueNumber int, label string) erro
 
 // ListOpenComments lists unresolved comments in the Github repository.
 func (gc *GithubClient) ListOpenComments(options ListCommentOptions) ([]Comment, error) {
-	toReturn := []Comment{}
-
 	prs, _, err := gc.client.PullRequests.List(gc.ctx, gc.repo.Owner.Handle, gc.repo.Name, nil)
 	if err != nil {
 		return nil, err
 	}
+
+	allComments := []Comment{}
+	repliedTo := make(map[int64]bool)
+
 	for _, pr := range prs {
 		if pr.GetUser().GetLogin() != gc.self.Handle {
 			continue
@@ -176,10 +178,11 @@ func (gc *GithubClient) ListOpenComments(options ListCommentOptions) ([]Comment,
 			return nil, err
 		}
 
-		// TODO: filter out comments that "self" has already replied to
-		// TODO: ignore resolved comments
 		for _, c := range comments {
 			commentUser := c.GetUser().GetLogin()
+			if commentUser == gc.self.Handle {
+				repliedTo[c.GetInReplyTo()] = true
+			}
 			allowedUser := false
 			for _, u := range options.Handles {
 				if commentUser == u {
@@ -206,7 +209,15 @@ func (gc *GithubClient) ListOpenComments(options ListCommentOptions) ([]Comment,
 				Branch:   branch,
 				PRNumber: pr.GetNumber(),
 			}
-			toReturn = append(toReturn, nextComment)
+			allComments = append(allComments, nextComment)
+		}
+	}
+
+	// remove any comments that bot has replied to already from the list
+	toReturn := []Comment{}
+	for _, c := range allComments {
+		if !repliedTo[c.ID] {
+			toReturn = append(toReturn, c)
 		}
 	}
 
@@ -216,6 +227,9 @@ func (gc *GithubClient) ListOpenComments(options ListCommentOptions) ([]Comment,
 // RespondToComment adds a comment to the provided thread.
 func (gc *GithubClient) RespondToComment(prNumber int, commentID int64, comment string) error {
 	_, _, err := gc.client.PullRequests.CreateCommentInReplyTo(gc.ctx, gc.repo.Owner.Handle, gc.repo.Name, prNumber, comment, commentID)
+	if err != nil {
+		return err
+	}
 
 	return err
 }

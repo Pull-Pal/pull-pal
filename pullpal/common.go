@@ -165,8 +165,10 @@ func (p *PullPal) handleIssue(issue vc.Issue) error {
 		return err
 	}
 	// todo remove hardcoded main
+	p.log.Info("checking out main branch")
 	err = p.localGitClient.CheckoutRemoteBranch("main")
 	if err != nil {
+		p.log.Info("error checking out main branch", zap.Error(err))
 		return err
 	}
 
@@ -186,8 +188,10 @@ func (p *PullPal) handleIssue(issue vc.Issue) error {
 		return err
 	}
 
+	p.log.Info("pushing to branch", zap.String("branchname", newBranchName))
 	err = p.localGitClient.PushBranch(newBranchName)
 	if err != nil {
+		p.log.Info("error pushing to branch", zap.Error(err))
 		return err
 	}
 
