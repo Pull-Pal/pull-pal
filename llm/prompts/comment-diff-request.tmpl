@@ -1,21 +1,21 @@
 File:
-  - name: {{ .Path }}:
+  - name: {{ .File.Path }}:
     contents:
     ```
-{{ .Contents }}
+{{ .File.Contents }}
     ```
 
 Diff:
 {{ .Diff }}
 
 Comment:
-{{ .Comment }}
+{{ .Contents }}
 
 The above is information about a comment left on a file. The diff contains information about the precise location of the comment.
 
 First, determine if the comment is a question or a request for changes.
-If the comment is a question, come up with an answer, and respond exactly as outlined in "Response Template A"
-If the comment is a request, modify the file provided at the beginning of the message, and respond exactly as outlined in "Response Template B".
+If the comment is a question, come up with an answer, and respond exactly as outlined directly below "Response Template A"
+If the comment is a request, modify the file provided at the beginning of the message, and respond exactly as outlined directly below "Response Template B".
 
 Response Template A:
 Q
@@ -24,9 +24,9 @@ Q
 Response Template B:
 R
 Files:
-  ppname: {{ .Path }}
-    ppcontents:
-    [new {{ .Path }} contents]
+ppname: {{ .File.Path }}
+ppcontents:
+[new {{ .File.Path }} contents]
 
 ppresponse:
 [additional context about your changes]

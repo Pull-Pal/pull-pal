@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 )
@@ -60,45 +61,52 @@ func NewLocalGitClient( /*ctx context.Context, */ log *zap.Logger, self Author, 
 	}, nil
 }
 
-/*
-func (gc *LocalGitClient) SwitchBranch(branchName string) (err error) {
+func (gc *LocalGitClient) CheckoutRemoteBranch(branchName string) (err error) {
 	if gc.worktree == nil {
 		return errors.New("worktree is nil - cannot check out a branch")
 	}
 
-	branchRefName := plumbing.NewBranchReferenceName(branchName)
-	// remoteName := "origin"
-
-	err = gc.repo.localRepo.Fetch(&git.FetchOptions{
-		RefSpecs: []config.RefSpec{"refs/*:refs/*", "HEAD:refs/heads/HEAD"},
-	})
-	if err != nil {
-		return err
-	}
-
-	err = gc.worktree.Checkout(&git.CheckoutOptions{
-		Branch: branchRefName,
+	// TODO configurable remote
+	branchRefName := plumbing.NewRemoteReferenceName("origin", branchName)
+	branchCoOpts := git.CheckoutOptions{
+		Branch: plumbing.ReferenceName(branchRefName),
 		Force:  true,
-	})
+	}
+	err = gc.worktree.Checkout(&branchCoOpts)
 	if err != nil {
 		return err
 	}
-		err = gc.repo.localRepo.CreateBranch(&config.Branch{
-			Name:   branchName,
-			Remote: remoteName,
-			Merge:  branchRefName,
-		})
-		if err != nil {
-			return err
-		}
+
+	// Pull the latest changes from the remote branch
+	err = gc.worktree.Pull(&git.PullOptions{
+		RemoteName: "origin",
+		Auth: &http.BasicAuth{
+			Username: gc.self.Handle,
+			Password: gc.self.Token,
+		},
+	})
+	if err != nil && err != git.NoErrAlreadyUpToDate {
+		return err
+	}
 
 	return nil
 }
-*/
 
 func (gc *LocalGitClient) PushBranch(branchName string) (err error) {
 	//branchRefName := plumbing.NewBranchReferenceName(branchName)
 	remoteName := "origin"
+
+	headRef, err := gc.repo.localRepo.Head()
+	if err != nil {
+		return err
+	}
+
+	// Create new branch at current HEAD
+	branchRef := plumbing.NewHashReference(plumbing.NewBranchReferenceName(branchName), headRef.Hash())
+	err = gc.repo.localRepo.Storer.SetReference(branchRef)
+	if err != nil {
+		return err
+	}
 
 	// Push the new branch to the remote repository
 	remote, err := gc.repo.localRepo.Remote(remoteName)
@@ -109,7 +117,7 @@ func (gc *LocalGitClient) PushBranch(branchName string) (err error) {
 	err = remote.Push(&git.PushOptions{
 		RemoteName: remoteName,
 		// TODO remove hardcoded "main"
-		RefSpecs: []config.RefSpec{config.RefSpec(fmt.Sprintf("+refs/heads/%s:refs/heads/%s", "main", branchName))},
+		RefSpecs: []config.RefSpec{config.RefSpec(fmt.Sprintf("+refs/heads/%s:refs/heads/%s", branchName, branchName))},
 		Auth: &http.BasicAuth{
 			Username: gc.self.Handle,
 			Password: gc.self.Token,
