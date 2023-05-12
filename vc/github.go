@@ -48,7 +48,7 @@ func NewGithubClient(ctx context.Context, log *zap.Logger, self Author, repo Rep
 }
 
 // OpenCodeChangeRequest pushes to a new remote branch and opens a PR on Github.
-func (gc *GithubClient) OpenCodeChangeRequest(req llm.CodeChangeRequest, res llm.CodeChangeResponse, fromBranch, toBranch string) (id, url string, err error) {
+func (gc *GithubClient) OpenCodeChangeRequest(req llm.CodeChangeRequest, res llm.CodeChangeResponse, fromBranch string) (id, url string, err error) {
 	// TODO handle gc.ctx canceled
 
 	title := req.Subject
@@ -57,13 +57,13 @@ func (gc *GithubClient) OpenCodeChangeRequest(req llm.CodeChangeRequest, res llm
 	}
 
 	body := res.Notes
-	body += fmt.Sprintf("\n\nResolves #%s", req.IssueID)
+	body += fmt.Sprintf("\n\nResolves #%d", req.IssueNumber)
 
 	// Finally, open a pull request from the new branch.
 	pr, _, err := gc.client.PullRequests.Create(gc.ctx, gc.repo.Owner.Handle, gc.repo.Name, &github.NewPullRequest{
 		Title: &title,
 		Head:  &fromBranch,
-		Base:  &toBranch,
+		Base:  &req.BaseBranch,
 		Body:  &body,
 	})
 	if err != nil {
@@ -102,7 +102,7 @@ func (gc *GithubClient) ListOpenIssues(options ListIssueOptions) ([]Issue, error
 		}
 
 		nextIssue := Issue{
-			ID:      strconv.Itoa(issue.GetNumber()),
+			Number:  issue.GetNumber(),
 			Subject: issue.GetTitle(),
 			Body:    issue.GetBody(),
 			URL:     issue.GetHTMLURL(),

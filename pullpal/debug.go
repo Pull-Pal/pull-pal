@@ -9,37 +9,38 @@ import (
 
 func (p *PullPal) DebugGit() error {
 	p.log.Info("Starting Pull Pal git debug")
+	r := p.repos[0]
 
 	// create commit with file changes
-	err := p.localGitClient.StartCommit()
+	err := r.localGitClient.StartCommit()
 	//err = p.ghClient.StartCommit()
 	if err != nil {
-		p.log.Error("error starting commit", zap.Error(err))
+		r.log.Error("error starting commit", zap.Error(err))
 		return err
 	}
 	newBranchName := "debug-branch"
 
 	for _, f := range []string{"a", "b"} {
-		err = p.localGitClient.ReplaceOrAddLocalFile(llm.File{
+		err = r.localGitClient.ReplaceOrAddLocalFile(llm.File{
 			Path:     f,
 			Contents: "hello",
 		})
 		if err != nil {
-			p.log.Error("error replacing or adding file", zap.Error(err))
+			r.log.Error("error replacing or adding file", zap.Error(err))
 			return err
 		}
 	}
 
 	commitMessage := "debug commit message"
-	err = p.localGitClient.FinishCommit(commitMessage)
+	err = r.localGitClient.FinishCommit(commitMessage)
 	if err != nil {
-		p.log.Error("error finishing commit", zap.Error(err))
+		r.log.Error("error finishing commit", zap.Error(err))
 		return err
 	}
 
-	err = p.localGitClient.PushBranch(newBranchName)
+	err = r.localGitClient.PushBranch(newBranchName)
 	if err != nil {
-		p.log.Error("error pushing branch", zap.Error(err))
+		r.log.Error("error pushing branch", zap.Error(err))
 		return err
 	}
 
@@ -49,25 +50,26 @@ func (p *PullPal) DebugGit() error {
 // todo dont require args for listing comments
 func (p *PullPal) DebugGithub(handles []string) error {
 	p.log.Info("Starting Pull Pal Github debug")
+	r := p.repos[0]
 
-	issues, err := p.ghClient.ListOpenIssues(p.listIssueOptions)
+	issues, err := r.ghClient.ListOpenIssues(r.listIssueOptions)
 	if err != nil {
-		p.log.Error("error listing issues", zap.Error(err))
+		r.log.Error("error listing issues", zap.Error(err))
 		return err
 	}
 	for _, i := range issues {
-		p.log.Info("got issue", zap.String("issue", i.String()))
+		r.log.Info("got issue", zap.String("issue", i.String()))
 	}
 
-	comments, err := p.ghClient.ListOpenComments(vc.ListCommentOptions{
+	comments, err := r.ghClient.ListOpenComments(vc.ListCommentOptions{
 		Handles: handles,
 	})
 	if err != nil {
-		p.log.Error("error listing comments", zap.Error(err))
+		r.log.Error("error listing comments", zap.Error(err))
 		return err
 	}
 	for _, c := range comments {
-		p.log.Info("got comment", zap.String("comment", c.String()))
+		r.log.Info("got comment", zap.String("comment", c.String()))
 	}
 
 	return nil
@@ -82,10 +84,10 @@ func (p *PullPal) DebugLLM() error {
 	}
 
 	codeChangeRequest := llm.CodeChangeRequest{
-		Files:   []llm.File{file},
-		Subject: "update port and add endpoint",
-		Body:    "use port 8080 for the server in main.go. Also add an endpoint at GET /api/numbers that returns a random integer between 2 and 10",
-		IssueID: "1234",
+		Files:       []llm.File{file},
+		Subject:     "update port and add endpoint",
+		Body:        "use port 8080 for the server in main.go. Also add an endpoint at GET /api/numbers that returns a random integer between 2 and 10",
+		IssueNumber: 1234,
 	}
 
 	p.log.Info("CODE CHANGE REQUEST", zap.String("request", codeChangeRequest.String()))

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/mobyvb/pull-pal/pullpal"
 	"github.com/mobyvb/pull-pal/vc"
@@ -23,17 +24,15 @@ type config struct {
 	openAIToken string
 
 	// remote repo info
-	repoDomain string
-	repoHandle string
-	repoName   string
+	repos []string
 
 	// local paths
 	localRepoPath string
 
 	// program settings
-	promptToClipboard   bool
 	usersToListenTo     []string
 	requiredIssueLabels []string
+	waitDuration        time.Duration
 }
 
 func getConfig() config {
@@ -43,15 +42,13 @@ func getConfig() config {
 		githubToken: viper.GetString("github-token"),
 		openAIToken: viper.GetString("open-ai-token"),
 
-		repoDomain: viper.GetString("repo-domain"),
-		repoHandle: viper.GetString("repo-handle"),
-		repoName:   viper.GetString("repo-name"),
+		repos: viper.GetStringSlice("repos"),
 
 		localRepoPath: viper.GetString("local-repo-path"),
 
-		promptToClipboard:   viper.GetBool("prompt-to-clipboard"),
 		usersToListenTo:     viper.GetStringSlice("users-to-listen-to"),
 		requiredIssueLabels: viper.GetStringSlice("required-issue-labels"),
+		waitDuration:        viper.GetDuration("wait-duration"),
 	}
 }
 
@@ -68,20 +65,22 @@ func getPullPal(ctx context.Context, cfg config) (*pullpal.PullPal, error) {
 		Handle: cfg.selfHandle,
 		Token:  cfg.githubToken,
 	}
-	repo := vc.Repository{
-		LocalPath:  cfg.localRepoPath,
-		HostDomain: cfg.repoDomain,
-		Name:       cfg.repoName,
-		Owner: vc.Author{
-			Handle: cfg.repoHandle,
-		},
-	}
 	listIssueOptions := vc.ListIssueOptions{
 		Handles: cfg.usersToListenTo,
 		Labels:  cfg.requiredIssueLabels,
 	}
 	// TODO make model configurable
-	p, err := pullpal.NewPullPal(ctx, log.Named("pullpal"), listIssueOptions, author, repo, openai.GPT4, cfg.openAIToken)
+	ppCfg := pullpal.Config{
+		WaitDuration:     cfg.waitDuration,
+		LocalRepoPath:    cfg.localRepoPath,
+		Repos:            cfg.repos,
+		Self:             author,
+		ListIssueOptions: listIssueOptions,
+		// TODO configurable model
+		Model:       openai.GPT4,
+		OpenAIToken: cfg.openAIToken,
+	}
+	p, err := pullpal.NewPullPal(ctx, log.Named("pullpal"), ppCfg)
 
 	return p, err
 }
@@ -129,28 +128,26 @@ func init() {
 	rootCmd.PersistentFlags().StringP("github-token", "t", "GITHUB TOKEN", "token for authenticating Github actions")
 	rootCmd.PersistentFlags().StringP("open-ai-token", "k", "OPENAI TOKEN", "token for authenticating OpenAI")
 
-	rootCmd.PersistentFlags().StringP("repo-domain", "d", "github.com", "domain for version control server")
-	rootCmd.PersistentFlags().StringP("repo-handle", "o", "REPO-HANDLE", "handle of repository's owner on version control server")
-	rootCmd.PersistentFlags().StringP("repo-name", "n", "REPO-NAME", "name of repository on version control server")
+	rootCmd.PersistentFlags().StringSliceP("repos", "r", []string{}, "a list of git repositories that Pull Pal will monitor")
 
-	rootCmd.PersistentFlags().StringP("local-repo-path", "l", "/tmp/pullpallrepo", "local path to check out ephemeral repository in")
+	rootCmd.PersistentFlags().StringP("local-repo-path", "l", "/tmp/pullpalrepo", "local path to check out ephemeral repository in")
 
 	rootCmd.PersistentFlags().StringSliceP("users-to-listen-to", "a", []string{}, "a list of Github users that Pull Pal will respond to")
 	rootCmd.PersistentFlags().StringSliceP("required-issue-labels", "i", []string{}, "a list of labels that are required for Pull Pal to select an issue")
+	rootCmd.PersistentFlags().Duration("wait-time", 30*time.Second, "the amount of time Pull Pal should wait when no issues or comments are found to address")
 
 	viper.BindPFlag("handle", rootCmd.PersistentFlags().Lookup("handle"))
 	viper.BindPFlag("email", rootCmd.PersistentFlags().Lookup("email"))
 	viper.BindPFlag("github-token", rootCmd.PersistentFlags().Lookup("github-token"))
 	viper.BindPFlag("open-ai-token", rootCmd.PersistentFlags().Lookup("open-ai-token"))
 
-	viper.BindPFlag("repo-domain", rootCmd.PersistentFlags().Lookup("repo-domain"))
-	viper.BindPFlag("repo-handle", rootCmd.PersistentFlags().Lookup("repo-handle"))
-	viper.BindPFlag("repo-name", rootCmd.PersistentFlags().Lookup("repo-name"))
+	viper.BindPFlag("repos", rootCmd.PersistentFlags().Lookup("repos"))
 
 	viper.BindPFlag("local-repo-path", rootCmd.PersistentFlags().Lookup("local-repo-path"))
 
 	viper.BindPFlag("users-to-listen-to", rootCmd.PersistentFlags().Lookup("users-to-listen-to"))
 	viper.BindPFlag("required-issue-labels", rootCmd.PersistentFlags().Lookup("required-issue-labels"))
+	viper.BindPFlag("wait-time", rootCmd.PersistentFlags().Lookup("wait-time"))
 }
 
 func initConfig() {
