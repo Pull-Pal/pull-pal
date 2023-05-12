@@ -22,6 +22,7 @@ import (
 
 // LocalGitClient represents a service that interacts with a local git repository.
 type LocalGitClient struct {
+	log  *zap.Logger
 	self Author
 	repo Repository
 
@@ -29,7 +30,7 @@ type LocalGitClient struct {
 }
 
 // NewLocalGitClient initializes a local git client by checking out a repository locally.
-func NewLocalGitClient( /*ctx context.Context, */ log *zap.Logger, self Author, repo Repository) (*LocalGitClient, error) {
+func NewLocalGitClient(log *zap.Logger, self Author, repo Repository) (*LocalGitClient, error) {
 	log.Info("checking out local github repo", zap.String("repo name", repo.Name), zap.String("local path", repo.LocalPath))
 	// clone provided repository to local path
 	if repo.LocalPath == "" {
@@ -56,6 +57,7 @@ func NewLocalGitClient( /*ctx context.Context, */ log *zap.Logger, self Author, 
 	repo.localRepo = localRepo
 
 	return &LocalGitClient{
+		log:  log,
 		self: self,
 		repo: repo,
 	}, nil
@@ -78,17 +80,19 @@ func (gc *LocalGitClient) CheckoutRemoteBranch(branchName string) (err error) {
 	}
 
 	// Pull the latest changes from the remote branch
-	err = gc.worktree.Pull(&git.PullOptions{
-		RemoteName: "origin",
-		Auth: &http.BasicAuth{
-			Username: gc.self.Handle,
-			Password: gc.self.Token,
-		},
-	})
-	if err != nil && err != git.NoErrAlreadyUpToDate {
-		return err
-	}
-
+	/*
+		err = gc.worktree.Pull(&git.PullOptions{
+			RemoteName: "origin",
+			Auth: &http.BasicAuth{
+				Username: gc.self.Handle,
+				Password: gc.self.Token,
+			},
+			Force: true,
+		})
+		if err != nil && err != git.NoErrAlreadyUpToDate {
+			return err
+		}
+	*/
 	return nil
 }
 
@@ -234,11 +238,13 @@ func (gc *LocalGitClient) ParseIssueAndStartCommit(issue Issue) (llm.CodeChangeR
 	// start a worktree
 	err := gc.StartCommit()
 	if err != nil {
+		gc.log.Error("error starting commit", zap.Error(err))
 		return changeRequest, err
 	}
 
 	err = gc.CheckoutRemoteBranch(issueBody.BaseBranch)
 	if err != nil {
+		gc.log.Error("error checking out remote branch", zap.Error(err))
 		return changeRequest, err
 	}
 
@@ -247,6 +253,7 @@ func (gc *LocalGitClient) ParseIssueAndStartCommit(issue Issue) (llm.CodeChangeR
 	for _, path := range issueBody.FilePaths {
 		nextFile, err := gc.GetLocalFile(path)
 		if err != nil {
+			gc.log.Error("error getting local file", zap.Error(err))
 			return changeRequest, err
 		}
 		files = append(files, nextFile)

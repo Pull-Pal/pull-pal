@@ -147,7 +147,7 @@ func (p pullPalRepo) checkIssuesAndComments() error {
 		if err != nil {
 			// TODO leave comment if error (make configurable)
 			p.log.Error("error handling issue", zap.Error(err))
-			commentText := fmt.Sprintf("I ran into a problem working on this:\n```\n%w\n```", err)
+			commentText := fmt.Sprintf("I ran into a problem working on this:\n```\n%s\n```", err.Error())
 			err = p.ghClient.CommentOnIssue(issue.Number, commentText)
 			if err != nil {
 				p.log.Error("error commenting on issue with error", zap.Error(err))
@@ -175,7 +175,7 @@ func (p pullPalRepo) checkIssuesAndComments() error {
 		if err != nil {
 			// TODO leave comment if error (make configurable)
 			p.log.Error("error handling comment", zap.Error(err))
-			commentText := fmt.Sprintf("I ran into a problem working on this:\n```\n%w\n```", err)
+			commentText := fmt.Sprintf("I ran into a problem working on this:\n```\n%s\n```", err.Error())
 			err = p.ghClient.RespondToComment(comment.PRNumber, comment.ID, commentText)
 			if err != nil {
 				p.log.Error("error commenting on thread with error", zap.Error(err))
@@ -202,6 +202,7 @@ func (p *pullPalRepo) handleIssue(issue vc.Issue) error {
 
 	changeRequest, err := p.localGitClient.ParseIssueAndStartCommit(issue)
 	if err != nil {
+		p.log.Error("error parsing issue and starting commit", zap.Error(err))
 		return err
 	}
 
