@@ -22,17 +22,16 @@ The minimal configuration you need looks like this:
 ```
 handle: [username of your bot's Github account]
 email: [email of your bot's Github account]
-repo-handle: [username of repository owner's Github account]
-repo-name: [name of repository on Github]
-users-to-listen-to: [comma-separated list of Github users who your bot will interact with on Github issues and PRs]
-required-issue-labels: [comma-separated list of issue labels that an issue must have in order to be considered by the bot (can be empty)]
+repos: [list of repositories, e.g. "github.com/owner/name" that bot will monitor]
+users-to-listen-to: [list of Github users who your bot will interact with on Github issues and PRs]
+required-issue-labels: [list of issue labels that an issue must have in order to be considered by the bot (can be empty)]
 github-token: ghp_xxx
 open-ai-token: sk-xxx
 ```
 
 You can acquire the Github token under "developer settings" in Github, in the "personal access tokens" section. The necessary requirements are:
 * this token must be created for the same account associated with `handle` and `email` in your config. Important to remember if you are using a separate Github account for your bot
-* the token must have permissions to interact with the repository at github.com/[repo-handle]/[repo-name]
+* the token must have permissions to interact with the repositories configured in `repos`
 * the token must have read and write permission to commit statuses, repository contents, discussions, issues, and pull requests
 
 You can generate an API key for OpenAI by logging in to platform.openai.com, then going to https://platform.openai.com/account/api-keys
@@ -71,6 +70,8 @@ Example of an issue body that should be parseable by Pull Pal:
 Add an index.html file. It should have a content section populated with a heading and body about a cool new product. The content section should be centered horizontally and vertically, have a border radius, and have a drop shadow. It should have an off-white background color. The body of the page should have a soft, light color that is not white. The page should use a sans-serif font. The heading should be a different color than the rest of the text.
 
 Add a main.go file that serves index.html on port 8080.
+
+---
 
 Files: main.go, index.html
 ```
