@@ -2,6 +2,7 @@ package vc
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/go-git/go-git/v5"
 )
@@ -80,4 +81,47 @@ func (repo Repository) SSH() string {
 // HTTPS returns the HTTPS representation of the remote repository.
 func (repo Repository) HTTPS() string {
 	return fmt.Sprintf("https://%s/%s/%s.git", repo.HostDomain, repo.Owner.Handle, repo.Name)
+}
+
+type IssueBody struct {
+	PromptBody string
+	FilePaths  []string
+	BaseBranch string
+}
+
+func ParseIssueBody(body string) IssueBody {
+	issueBody := IssueBody{
+		BaseBranch: "main",
+	}
+	divider := "---"
+
+	parts := strings.Split(body, divider)
+	issueBody.PromptBody = strings.TrimSpace(parts[0])
+	// if there was nothing to split, no additional configuration was provided
+	if len(parts) <= 1 {
+		return issueBody
+	}
+
+	configStr := parts[1]
+	configLines := strings.Split(configStr, "\n")
+	for _, line := range configLines {
+		lineParts := strings.Split(line, ":")
+		if len(lineParts) < 2 {
+			continue
+		}
+		key := strings.ToLower(strings.TrimSpace(lineParts[0]))
+		if key == "base" {
+			issueBody.BaseBranch = strings.TrimSpace(lineParts[1])
+			continue
+		}
+		if key == "files" {
+			filePaths := strings.Split(lineParts[1], ",")
+			for _, p := range filePaths {
+				issueBody.FilePaths = append(issueBody.FilePaths, strings.TrimSpace(p))
+			}
+			continue
+		}
+	}
+
+	return issueBody
 }

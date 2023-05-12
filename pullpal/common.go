@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/mobyvb/pull-pal/llm"
@@ -74,6 +73,7 @@ func (p *PullPal) Run() error {
 			issue := issues[0]
 			err = p.handleIssue(issue)
 			if err != nil {
+				// TODO leave comment if error (make configurable)
 				p.log.Error("error handling issue", zap.Error(err))
 			}
 		}
@@ -95,6 +95,7 @@ func (p *PullPal) Run() error {
 			comment := comments[0]
 			err = p.handleComment(comment)
 			if err != nil {
+				// TODO leave comment if error (make configurable)
 				p.log.Error("error handling comment", zap.Error(err))
 			}
 		}
@@ -112,7 +113,7 @@ func (p *PullPal) handleIssue(issue vc.Issue) error {
 		return err
 	}
 
-	err = p.ghClient.CommentOnIssue(issueNumber, "on it")
+	err = p.ghClient.CommentOnIssue(issueNumber, "working on it")
 	if err != nil {
 		p.log.Error("error commenting on issue", zap.Error(err))
 		return err
@@ -125,50 +126,13 @@ func (p *PullPal) handleIssue(issue vc.Issue) error {
 		}
 	}
 
-	// remove file list from issue body
-	// TODO do this better and probably somewhere else
-	parts := strings.Split(issue.Body, "Files:")
-	issue.Body = parts[0]
-
-	fileList := []string{}
-	if len(parts) > 1 {
-		fileList = strings.Split(parts[1], ",")
-	}
-
-	// get file contents from local git repository
-	files := []llm.File{}
-	for _, path := range fileList {
-		path = strings.TrimSpace(path)
-		nextFile, err := p.localGitClient.GetLocalFile(path)
-		if err != nil {
-			return err
-		}
-		files = append(files, nextFile)
-	}
-
-	changeRequest := llm.CodeChangeRequest{
-		Subject: issue.Subject,
-		Body:    issue.Body,
-		IssueID: issue.ID,
-		Files:   files,
+	changeRequest, err := p.localGitClient.ParseIssueAndStartCommit(issue)
+	if err != nil {
+		return err
 	}
 
 	changeResponse, err := p.openAIClient.EvaluateCCR(p.ctx, "", changeRequest)
 	if err != nil {
-		return err
-
-	}
-
-	// create commit with file changes
-	err = p.localGitClient.StartCommit()
-	if err != nil {
-		return err
-	}
-	// todo remove hardcoded main
-	p.log.Info("checking out main branch")
-	err = p.localGitClient.CheckoutRemoteBranch("main")
-	if err != nil {
-		p.log.Info("error checking out main branch", zap.Error(err))
 		return err
 	}
 
@@ -197,7 +161,7 @@ func (p *PullPal) handleIssue(issue vc.Issue) error {
 
 	// open code change request
 	// TODO don't hardcode main branch, make configurable
-	_, url, err := p.ghClient.OpenCodeChangeRequest(changeRequest, changeResponse, newBranchName, "main")
+	_, url, err := p.ghClient.OpenCodeChangeRequest(changeRequest, changeResponse, newBranchName)
 	if err != nil {
 		return err
 	}

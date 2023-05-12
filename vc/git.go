@@ -219,3 +219,44 @@ func (gc *LocalGitClient) FinishCommit(message string) error {
 
 	return nil
 }
+
+// ParseIssueAndStartCommit parses the information provided in the issue to check out the appropriate branch,
+// get the contents of the files mentioned in the issue, and initialize the worktree.
+func (gc *LocalGitClient) ParseIssue(issue Issue) (llm.CodeChangeRequest, error) {
+	var changeRequest llm.CodeChangeRequest
+
+	if gc.worktree != nil {
+		return changeRequest, errors.New("worktree is active - some other work is incomplete")
+	}
+
+	issueBody := ParseIssueBody(issue.Body)
+
+	// start a worktree
+	err := gc.StartCommit()
+	if err != nil {
+		return changeRequest, err
+	}
+
+	err = gc.CheckoutRemoteBranch(issueBody.BaseBranch)
+	if err != nil {
+		return changeRequest, err
+	}
+
+	// get file contents from local git repository
+	files := []llm.File{}
+	for _, path := range issueBody.FilePaths {
+		nextFile, err := gc.GetLocalFile(path)
+		if err != nil {
+			return changeRequest, err
+		}
+		files = append(files, nextFile)
+	}
+
+	return llm.CodeChangeRequest{
+		Subject:    issue.Subject,
+		Body:       issueBody.PromptBody,
+		IssueID:    issue.ID,
+		Files:      files,
+		BaseBranch: issueBody.BaseBranch,
+	}, nil
+}

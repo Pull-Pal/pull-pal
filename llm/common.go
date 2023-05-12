@@ -19,10 +19,11 @@ const (
 
 // CodeChangeRequest contains all necessary information for generating a prompt for a LLM.
 type CodeChangeRequest struct {
-	Files   []File
-	Subject string
-	Body    string
-	IssueID string
+	Files      []File
+	Subject    string
+	Body       string
+	IssueID    string
+	BaseBranch string
 }
 
 // CodeChangeResponse contains data derived from an LLM response to a prompt generated via a CodeChangeRequest.
