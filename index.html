@@ -9,8 +9,7 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #f6f8fa;
-            /* background-color: #9ed5c0; */
+            background-color: #e2f3f8;
         }
 
         h1, h2 {
@@ -31,12 +30,7 @@
             margin: auto;
             margin-top: 24px;
             border: 1px solid #e4e8eb;
-            background-color: #f9fbfc;
-            /*
-            background-color: #f6f8fa;
-            */
-            overflow: visible;
-
+            background-color: #f0f6fb;
         }
 
         .overflowcontainer {
@@ -68,7 +62,6 @@
         .card.show {
             opacity: 1;
             transform: translateY(0);
-            /* display: block; */
         }
 
         .issue-title {
@@ -173,16 +166,12 @@ Files: README.md,index.html,main.go</div>
             <div class="added">+     randomNumber := rand.Intn(31) + 20</div>
             <div class="added">+     fmt.Fprint(w, strconv.Itoa(randomNumber))</div>
             <div class="added">+ })</div>
-            <div class="removed">- Existing code line 2</div>
-            <div class="added">+ New code line 2</div>
-            <div class="removed">- Existing code line 1</div>
-            <div class="added">+ New code line 1</div>
-            <div class="removed">- Existing code line 2</div>
-            <div class="added">+ New code line 2</div>
-            <div class="removed">- Existing code line 1</div>
-            <div class="added">+ New code line 1</div>
-            <div class="removed">- Existing code line 2</div>
-            <div class="added">+ New code line 2</div>
+            <div class="removed">- func setHeaders(w *http.ResponseWriter) { </div>
+            <div class="added">+ func setCustomHeaders(w *http.ResponseWriter) { </div>
+            <div class="removed">- backgroundColor = "white" </div>
+            <div class="added">+ backgroundColor = "#f0f6fb" </div>
+            <div class="removed">- router.HandleFunc("/api/strings", stringHandler) </div>
+            <div class="added">+ router.HandleFunc("/api/number", numberHandler) </div>
                 </div>
         </div>
         </div>
@@ -236,17 +225,6 @@ pauseBtn.addEventListener('click', () => {
 nextBtn.addEventListener('click', () => {
     updateCards();
 });
-        /*
-prevBtn.addEventListener('click', () => {
-    currentIndex -= 1;
-    updateCards();
-});
-
-nextBtn.addEventListener('click', () => {
-    currentIndex += 1;
-    updateCards();
-});
-       */
 
 updateCards();
     </script>
