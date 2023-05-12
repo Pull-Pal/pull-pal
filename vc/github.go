@@ -57,7 +57,7 @@ func (gc *GithubClient) OpenCodeChangeRequest(req llm.CodeChangeRequest, res llm
 	}
 
 	body := res.Notes
-	body += fmt.Sprintf("\n\nResolves #%s", req.IssueID)
+	body += fmt.Sprintf("\n\nResolves #%d", req.IssueNumber)
 
 	// Finally, open a pull request from the new branch.
 	pr, _, err := gc.client.PullRequests.Create(gc.ctx, gc.repo.Owner.Handle, gc.repo.Name, &github.NewPullRequest{
@@ -102,7 +102,7 @@ func (gc *GithubClient) ListOpenIssues(options ListIssueOptions) ([]Issue, error
 		}
 
 		nextIssue := Issue{
-			ID:      strconv.Itoa(issue.GetNumber()),
+			Number:  issue.GetNumber(),
 			Subject: issue.GetTitle(),
 			Body:    issue.GetBody(),
 			URL:     issue.GetHTMLURL(),

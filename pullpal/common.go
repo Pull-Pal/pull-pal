@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/mobyvb/pull-pal/llm"
@@ -75,6 +74,12 @@ func (p *PullPal) Run() error {
 			if err != nil {
 				// TODO leave comment if error (make configurable)
 				p.log.Error("error handling issue", zap.Error(err))
+				commentText := fmt.Sprintf("I ran into a problem working on this:\n```\n%w\n```", err)
+				err = p.ghClient.CommentOnIssue(issue.Number, commentText)
+				if err != nil {
+					p.log.Error("error commenting on issue with error", zap.Error(err))
+					return err
+				}
 			}
 		}
 
@@ -97,6 +102,12 @@ func (p *PullPal) Run() error {
 			if err != nil {
 				// TODO leave comment if error (make configurable)
 				p.log.Error("error handling comment", zap.Error(err))
+				commentText := fmt.Sprintf("I ran into a problem working on this:\n```\n%w\n```", err)
+				err = p.ghClient.RespondToComment(comment.PRNumber, comment.ID, commentText)
+				if err != nil {
+					p.log.Error("error commenting on thread with error", zap.Error(err))
+					return err
+				}
 			}
 		}
 
@@ -107,19 +118,13 @@ func (p *PullPal) Run() error {
 }
 
 func (p *PullPal) handleIssue(issue vc.Issue) error {
-	issueNumber, err := strconv.Atoi(issue.ID)
-	if err != nil {
-		p.log.Error("error converting issue ID to int", zap.Error(err))
-		return err
-	}
-
-	err = p.ghClient.CommentOnIssue(issueNumber, "working on it")
+	err := p.ghClient.CommentOnIssue(issue.Number, "working on it")
 	if err != nil {
 		p.log.Error("error commenting on issue", zap.Error(err))
 		return err
 	}
 	for _, label := range p.listIssueOptions.Labels {
-		err = p.ghClient.RemoveLabelFromIssue(issueNumber, label)
+		err = p.ghClient.RemoveLabelFromIssue(issue.Number, label)
 		if err != nil {
 			p.log.Error("error removing labels from issue", zap.Error(err))
 			return err
@@ -136,7 +141,7 @@ func (p *PullPal) handleIssue(issue vc.Issue) error {
 		return err
 	}
 
-	newBranchName := fmt.Sprintf("fix-%s", changeRequest.IssueID)
+	newBranchName := fmt.Sprintf("fix-%d", issue.Number)
 	for _, f := range changeResponse.Files {
 		p.log.Info("replacing or adding file", zap.String("path", f.Path), zap.String("contents", f.Contents))
 		err = p.localGitClient.ReplaceOrAddLocalFile(f)
@@ -145,7 +150,7 @@ func (p *PullPal) handleIssue(issue vc.Issue) error {
 		}
 	}
 
-	commitMessage := changeRequest.Subject + "\n\n" + changeResponse.Notes + "\n\nResolves: #" + changeRequest.IssueID
+	commitMessage := fmt.Sprintf("%s\n\n%s\n\nResolves #%d", changeRequest.Subject, changeResponse.Notes, changeRequest.IssueNumber)
 	p.log.Info("about to create commit", zap.String("message", commitMessage))
 	err = p.localGitClient.FinishCommit(commitMessage)
 	if err != nil {

@@ -222,7 +222,7 @@ func (gc *LocalGitClient) FinishCommit(message string) error {
 
 // ParseIssueAndStartCommit parses the information provided in the issue to check out the appropriate branch,
 // get the contents of the files mentioned in the issue, and initialize the worktree.
-func (gc *LocalGitClient) ParseIssue(issue Issue) (llm.CodeChangeRequest, error) {
+func (gc *LocalGitClient) ParseIssueAndStartCommit(issue Issue) (llm.CodeChangeRequest, error) {
 	var changeRequest llm.CodeChangeRequest
 
 	if gc.worktree != nil {
@@ -253,10 +253,10 @@ func (gc *LocalGitClient) ParseIssue(issue Issue) (llm.CodeChangeRequest, error)
 	}
 
 	return llm.CodeChangeRequest{
-		Subject:    issue.Subject,
-		Body:       issueBody.PromptBody,
-		IssueID:    issue.ID,
-		Files:      files,
-		BaseBranch: issueBody.BaseBranch,
+		Subject:     issue.Subject,
+		Body:        issueBody.PromptBody,
+		IssueNumber: issue.Number,
+		Files:       files,
+		BaseBranch:  issueBody.BaseBranch,
 	}, nil
 }

@@ -82,10 +82,10 @@ func (p *PullPal) DebugLLM() error {
 	}
 
 	codeChangeRequest := llm.CodeChangeRequest{
-		Files:   []llm.File{file},
-		Subject: "update port and add endpoint",
-		Body:    "use port 8080 for the server in main.go. Also add an endpoint at GET /api/numbers that returns a random integer between 2 and 10",
-		IssueID: "1234",
+		Files:       []llm.File{file},
+		Subject:     "update port and add endpoint",
+		Body:        "use port 8080 for the server in main.go. Also add an endpoint at GET /api/numbers that returns a random integer between 2 and 10",
+		IssueNumber: 1234,
 	}
 
 	p.log.Info("CODE CHANGE REQUEST", zap.String("request", codeChangeRequest.String()))

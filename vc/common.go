@@ -9,7 +9,7 @@ import (
 
 // Issue represents an issue on a version control server.
 type Issue struct {
-	ID      string
+	Number  int
 	Subject string
 	Body    string
 	URL     string
@@ -17,7 +17,7 @@ type Issue struct {
 }
 
 func (i Issue) String() string {
-	return fmt.Sprintf("Issue ID: %s\nAuthor: %s\nSubject: %s\nBody:\n%s\nURL: %s\n", i.ID, i.Author.Handle, i.Subject, i.Body, i.URL)
+	return fmt.Sprintf("Issue #: %d\nAuthor: %s\nSubject: %s\nBody:\n%s\nURL: %s\n", i.Number, i.Author.Handle, i.Subject, i.Body, i.URL)
 }
 
 // ListIssueOptions defines options for listing issues.
