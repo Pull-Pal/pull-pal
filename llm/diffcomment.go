@@ -26,6 +26,11 @@ func (req DiffCommentRequest) GetPrompt() (string, error) {
 		return "", err
 	}
 
+	replacer := strings.NewReplacer(
+		"\\n", newlineLiteral,
+	)
+	req.File.Contents = replacer.Replace(req.File.Contents)
+
 	var result bytes.Buffer
 	err = tmpl.Execute(&result, req)
 	if err != nil {

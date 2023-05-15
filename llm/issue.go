@@ -27,6 +27,16 @@ func (req CodeChangeRequest) GetPrompt() (string, error) {
 		return "", err
 	}
 
+	replacer := strings.NewReplacer(
+		"\\n", newlineLiteral,
+	)
+	newFiles := make([]File, len(req.Files))
+	for i, f := range req.Files {
+		f.Contents = replacer.Replace(f.Contents)
+		newFiles[i] = f
+	}
+	req.Files = newFiles
+
 	var result bytes.Buffer
 	err = tmpl.Execute(&result, req)
 	if err != nil {
