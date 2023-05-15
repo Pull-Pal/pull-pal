@@ -4,6 +4,10 @@ import (
 	"strings"
 )
 
+const (
+	newlineLiteral = "<|newline-literal|>"
+)
+
 // File represents a file in a git repository.
 type File struct {
 	Path     string
@@ -56,6 +60,7 @@ func parseFiles(filesSection string) []File {
 
 	replacer := strings.NewReplacer(
 		"\\n", "\n",
+		newlineLiteral, "\\n",
 		"\\\"", "\"",
 		"```", "",
 	)
