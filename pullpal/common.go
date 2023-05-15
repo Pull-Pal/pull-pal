@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"path/filepath"
 	"strings"
 	"time"
@@ -56,7 +57,6 @@ func NewPullPal(ctx context.Context, log *zap.Logger, cfg Config) (*PullPal, err
 	openAIClient := llm.NewOpenAIClient(log.Named("openaiClient"), cfg.Model, cfg.OpenAIToken)
 
 	ppRepos := []pullPalRepo{}
-	fmt.Println("asdfasfdasfasdfasdf")
 	for _, r := range cfg.Repos {
 		fmt.Println(r)
 		parts := strings.Split(r, "/")
@@ -130,7 +130,7 @@ func (p *PullPal) Run() error {
 
 // checkIssuesAndComments will attempt to find and solve one issue and one comment, and then return.
 func (p pullPalRepo) checkIssuesAndComments() error {
-	p.log.Info("checking github issues...")
+	p.log.Debug("checking github issues...")
 	issues, err := p.ghClient.ListOpenIssues(p.listIssueOptions)
 	if err != nil {
 		p.log.Error("error listing issues", zap.Error(err))
@@ -138,7 +138,7 @@ func (p pullPalRepo) checkIssuesAndComments() error {
 	}
 
 	if len(issues) == 0 {
-		p.log.Info("no issues found")
+		p.log.Debug("no issues found")
 	} else {
 		p.log.Info("picked issue to process")
 
@@ -156,7 +156,7 @@ func (p pullPalRepo) checkIssuesAndComments() error {
 		}
 	}
 
-	p.log.Info("checking pr comments...")
+	p.log.Debug("checking pr comments...")
 	comments, err := p.ghClient.ListOpenComments(vc.ListCommentOptions{
 		Handles: p.listIssueOptions.Handles,
 	})
@@ -166,7 +166,7 @@ func (p pullPalRepo) checkIssuesAndComments() error {
 	}
 
 	if len(comments) == 0 {
-		p.log.Info("no comments found")
+		p.log.Debug("no comments found")
 	} else {
 		p.log.Info("picked comment to process")
 
@@ -211,7 +211,8 @@ func (p *pullPalRepo) handleIssue(issue vc.Issue) error {
 		return err
 	}
 
-	newBranchName := fmt.Sprintf("fix-%d", issue.Number)
+	randomNumber := rand.Intn(100) + 1
+	newBranchName := fmt.Sprintf("fix-%d-%d", issue.Number, randomNumber)
 	for _, f := range changeResponse.Files {
 		p.log.Info("replacing or adding file", zap.String("path", f.Path), zap.String("contents", f.Contents))
 		err = p.localGitClient.ReplaceOrAddLocalFile(f)

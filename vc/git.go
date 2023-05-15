@@ -191,8 +191,13 @@ func (gc *LocalGitClient) ReplaceOrAddLocalFile(newFile llm.File) error {
 	}
 
 	fullPath := filepath.Join(gc.repo.LocalPath, newFile.Path)
+	dirPath := filepath.Dir(fullPath)
+	err := os.MkdirAll(dirPath, 0755)
+	if err != nil {
+		return err
+	}
 
-	err := ioutil.WriteFile(fullPath, []byte(newFile.Contents), 0644)
+	err = ioutil.WriteFile(fullPath, []byte(newFile.Contents), 0644)
 	if err != nil {
 		return err
 	}
