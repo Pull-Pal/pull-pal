@@ -298,7 +298,7 @@ func (p *pullPalRepo) handleComment(comment vc.Comment) error {
 		}
 	}
 
-	err = p.ghClient.RespondToComment(comment.PRNumber, comment.ID, diffCommentResponse.Answer)
+	err = p.ghClient.RespondToComment(comment.PRNumber, comment.ID, diffCommentResponse.Response)
 	if err != nil {
 		p.log.Error("error commenting on issue", zap.Error(err))
 		return err

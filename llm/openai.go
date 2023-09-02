@@ -44,10 +44,9 @@ func (oc *OpenAIClient) EvaluateCCR(ctx context.Context, model string, req CodeC
 
 	choice := resp.Choices[0].Message.Content
 
-	// TODO make debug log when I figure out how to config that
 	oc.log.Info("got response from llm", zap.String("output", choice))
 
-	return ParseCodeChangeResponse(choice), nil
+	return ParseCodeChangeResponse(choice)
 }
 
 func (oc *OpenAIClient) EvaluateDiffComment(ctx context.Context, model string, req DiffCommentRequest) (res DiffCommentResponse, err error) {
@@ -76,5 +75,5 @@ func (oc *OpenAIClient) EvaluateDiffComment(ctx context.Context, model string, r
 	// TODO make debug log when I figure out how to config that
 	oc.log.Info("got response from llm", zap.String("output", choice))
 
-	return ParseDiffCommentResponse(choice), nil
+	return ParseDiffCommentResponse(choice)
 }

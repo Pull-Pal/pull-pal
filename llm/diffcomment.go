@@ -2,7 +2,7 @@ package llm
 
 import (
 	"bytes"
-	"strings"
+	"encoding/json"
 	"text/template"
 )
 
@@ -40,14 +40,14 @@ func (res DiffCommentResponse) String() string {
 	out := ""
 	if res.Type == ResponseAnswer {
 		out += "Type: Answer\n"
-		out += res.Answer
+		out += res.Response
 		return out
 	}
 
 	out += "Type: Code Change\n"
 
 	out += "Response:\n"
-	out += res.Answer + "\n\n"
+	out += res.Response + "\n\n"
 	out += "Files:\n"
 	out += res.File.Path + ":\n```\n"
 	out += res.File.Contents + "\n```\n"
@@ -55,36 +55,8 @@ func (res DiffCommentResponse) String() string {
 	return out
 }
 
-func ParseDiffCommentResponse(llmResponse string) DiffCommentResponse {
-	llmResponse = strings.TrimSpace(llmResponse)
-	if llmResponse[0] == 'A' {
-		answer := strings.TrimSpace(llmResponse[1:])
-		return DiffCommentResponse{
-			Type:   ResponseAnswer,
-			Answer: answer,
-		}
-	}
-	parts := strings.Split(llmResponse, "ppresponse:")
-
-	filesSection := ""
-	if len(parts) > 0 {
-		filesSection = parts[0]
-	}
-
-	answer := ""
-	if len(parts) > 1 {
-		answer = strings.TrimSpace(parts[1])
-	}
-
-	files := parseFiles(filesSection)
-	f := File{}
-	if len(files) > 0 {
-		f = files[0]
-	}
-
-	return DiffCommentResponse{
-		Type:   ResponseCodeChange,
-		Answer: answer,
-		File:   f,
-	}
+func ParseDiffCommentResponse(llmResponse string) (DiffCommentResponse, error) {
+	var response DiffCommentResponse
+	err := json.Unmarshal([]byte(llmResponse), &response)
+	return response, err
 }
