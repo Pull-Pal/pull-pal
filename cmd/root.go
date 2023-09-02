@@ -34,6 +34,7 @@ type config struct {
 	requiredIssueLabels []string
 	waitDuration        time.Duration
 	debugDir            string
+	queueSize           int
 }
 
 func getConfig() config {
@@ -51,6 +52,7 @@ func getConfig() config {
 		requiredIssueLabels: viper.GetStringSlice("required-issue-labels"),
 		waitDuration:        viper.GetDuration("wait-duration"),
 		debugDir:            viper.GetString("debug-dir"),
+		queueSize:           viper.GetInt("queue-size"),
 	}
 }
 
@@ -74,6 +76,7 @@ func getPullPal(ctx context.Context, cfg config) (*pullpal.PullPal, error) {
 	// TODO make model configurable
 	ppCfg := pullpal.Config{
 		WaitDuration:     cfg.waitDuration,
+		QueueSize:        cfg.queueSize,
 		LocalRepoPath:    cfg.localRepoPath,
 		Repos:            cfg.repos,
 		Self:             author,
@@ -139,6 +142,7 @@ func init() {
 	rootCmd.PersistentFlags().StringSliceP("required-issue-labels", "i", []string{}, "a list of labels that are required for Pull Pal to select an issue")
 	rootCmd.PersistentFlags().Duration("wait-time", 30*time.Second, "the amount of time Pull Pal should wait when no issues or comments are found to address")
 	rootCmd.PersistentFlags().StringP("debug-dir", "d", "", "the path to use for the pull pal debug directory")
+	rootCmd.PersistentFlags().Int("queue-size", 10, "the size of the task queue for each repo")
 
 	viper.BindPFlag("handle", rootCmd.PersistentFlags().Lookup("handle"))
 	viper.BindPFlag("email", rootCmd.PersistentFlags().Lookup("email"))
@@ -153,6 +157,7 @@ func init() {
 	viper.BindPFlag("required-issue-labels", rootCmd.PersistentFlags().Lookup("required-issue-labels"))
 	viper.BindPFlag("wait-time", rootCmd.PersistentFlags().Lookup("wait-time"))
 	viper.BindPFlag("debug-dir", rootCmd.PersistentFlags().Lookup("debug-dir"))
+	viper.BindPFlag("queue-size", rootCmd.PersistentFlags().Lookup("queue-size"))
 }
 
 func initConfig() {
