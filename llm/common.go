@@ -33,6 +33,7 @@ type DiffCommentRequest struct {
 	File     File
 	Contents string
 	Diff     string
+	PRNumber int
 }
 
 type DiffCommentResponse struct {

@@ -26,6 +26,7 @@ type Config struct {
 	ListIssueOptions vc.ListIssueOptions
 	Model            string
 	OpenAIToken      string
+	DebugDir         string
 }
 
 // PullPal is the service responsible for:
@@ -54,7 +55,7 @@ type pullPalRepo struct {
 
 // NewPullPal creates a new "pull pal service", including setting up local version control and LLM integrations.
 func NewPullPal(ctx context.Context, log *zap.Logger, cfg Config) (*PullPal, error) {
-	openAIClient := llm.NewOpenAIClient(log.Named("openaiClient"), cfg.Model, cfg.OpenAIToken)
+	openAIClient := llm.NewOpenAIClient(log.Named("openaiClient"), cfg.Model, cfg.OpenAIToken, cfg.DebugDir)
 
 	ppRepos := []pullPalRepo{}
 	for _, r := range cfg.Repos {
@@ -260,6 +261,7 @@ func (p *pullPalRepo) handleComment(comment vc.Comment) error {
 		File:     file,
 		Contents: comment.Body,
 		Diff:     comment.DiffHunk,
+		PRNumber: comment.PRNumber,
 	}
 	p.log.Info("diff comment request", zap.String("req", diffCommentRequest.String()))
 

@@ -33,6 +33,7 @@ type config struct {
 	usersToListenTo     []string
 	requiredIssueLabels []string
 	waitDuration        time.Duration
+	debugDir            string
 }
 
 func getConfig() config {
@@ -49,6 +50,7 @@ func getConfig() config {
 		usersToListenTo:     viper.GetStringSlice("users-to-listen-to"),
 		requiredIssueLabels: viper.GetStringSlice("required-issue-labels"),
 		waitDuration:        viper.GetDuration("wait-duration"),
+		debugDir:            viper.GetString("debug-dir"),
 	}
 }
 
@@ -79,6 +81,7 @@ func getPullPal(ctx context.Context, cfg config) (*pullpal.PullPal, error) {
 		// TODO configurable model
 		Model:       openai.GPT4,
 		OpenAIToken: cfg.openAIToken,
+		DebugDir:    cfg.debugDir,
 	}
 	p, err := pullpal.NewPullPal(ctx, log.Named("pullpal"), ppCfg)
 
@@ -135,6 +138,7 @@ func init() {
 	rootCmd.PersistentFlags().StringSliceP("users-to-listen-to", "a", []string{}, "a list of Github users that Pull Pal will respond to")
 	rootCmd.PersistentFlags().StringSliceP("required-issue-labels", "i", []string{}, "a list of labels that are required for Pull Pal to select an issue")
 	rootCmd.PersistentFlags().Duration("wait-time", 30*time.Second, "the amount of time Pull Pal should wait when no issues or comments are found to address")
+	rootCmd.PersistentFlags().StringP("debug-dir", "d", "", "the path to use for the pull pal debug directory")
 
 	viper.BindPFlag("handle", rootCmd.PersistentFlags().Lookup("handle"))
 	viper.BindPFlag("email", rootCmd.PersistentFlags().Lookup("email"))
@@ -148,6 +152,7 @@ func init() {
 	viper.BindPFlag("users-to-listen-to", rootCmd.PersistentFlags().Lookup("users-to-listen-to"))
 	viper.BindPFlag("required-issue-labels", rootCmd.PersistentFlags().Lookup("required-issue-labels"))
 	viper.BindPFlag("wait-time", rootCmd.PersistentFlags().Lookup("wait-time"))
+	viper.BindPFlag("debug-dir", rootCmd.PersistentFlags().Lookup("debug-dir"))
 }
 
 func initConfig() {
