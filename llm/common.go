@@ -2,8 +2,8 @@ package llm
 
 // File represents a file in a git repository.
 type File struct {
-	Path     string `json:"path"`
-	Contents string `json:"contents"`
+	Path     string `yaml:"path"`
+	Contents string `yaml:"contents"`
 }
 
 type ResponseType int
@@ -24,8 +24,8 @@ type CodeChangeRequest struct {
 
 // CodeChangeResponse contains data derived from an LLM response to a prompt generated via a CodeChangeRequest.
 type CodeChangeResponse struct {
-	Files []File `json:"files"`
-	Notes string `json:"notes"`
+	Files []File `yaml:"files"`
+	Notes string `yaml:"notes"`
 }
 
 // TODO support threads
@@ -37,7 +37,7 @@ type DiffCommentRequest struct {
 }
 
 type DiffCommentResponse struct {
-	Type     ResponseType `json:"responseType"`
-	Response string       `json:"response"`
-	File     File         `json:"file"`
+	Type     ResponseType `yaml:"responseType"`
+	Response string       `yaml:"response"`
+	File     File         `yaml:"file"`
 }

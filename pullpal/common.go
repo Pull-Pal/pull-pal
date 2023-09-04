@@ -82,7 +82,7 @@ func NewPullPal(ctx context.Context, log *zap.Logger, cfg Config) (*PullPal, err
 		if err != nil {
 			return nil, err
 		}
-		localGitClient, err := vc.NewLocalGitClient(log.Named("gitclient-"+r), cfg.Self, newRepo)
+		localGitClient, err := vc.NewLocalGitClient(log.Named("gitclient-"+r), cfg.Self, newRepo, cfg.DebugDir)
 		if err != nil {
 			return nil, err
 		}
@@ -188,11 +188,13 @@ func (p pullPalRepo) checkIssuesAndComments() error {
 }
 
 func (p *pullPalRepo) handleIssue(issue vc.Issue) error {
-	err := p.ghClient.CommentOnIssue(issue.Number, "working on it")
-	if err != nil {
-		p.log.Error("error commenting on issue", zap.Error(err))
-		return err
-	}
+	/*
+		err := p.ghClient.CommentOnIssue(issue.Number, "working on it")
+		if err != nil {
+			p.log.Error("error commenting on issue", zap.Error(err))
+			return err
+		}
+	*/
 	for _, label := range p.listIssueOptions.Labels {
 		err = p.ghClient.RemoveLabelFromIssue(issue.Number, label)
 		if err != nil {

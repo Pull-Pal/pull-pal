@@ -93,6 +93,7 @@ func ParseIssueBody(body string) IssueBody {
 	issueBody := IssueBody{
 		BaseBranch: "main",
 	}
+	// TODO get rid of parsing like this - "---" may occur in the normal issue body
 	divider := "---"
 
 	parts := strings.Split(body, divider)

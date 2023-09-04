@@ -6,6 +6,7 @@ import (
 	"go/format"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -27,10 +28,11 @@ type LocalGitClient struct {
 	repo Repository
 
 	worktree *git.Worktree
+	debugDir string
 }
 
 // NewLocalGitClient initializes a local git client by checking out a repository locally.
-func NewLocalGitClient(log *zap.Logger, self Author, repo Repository) (*LocalGitClient, error) {
+func NewLocalGitClient(log *zap.Logger, self Author, repo Repository, debugDir string) (*LocalGitClient, error) {
 	log.Info("checking out local github repo", zap.String("repo name", repo.Name), zap.String("local path", repo.LocalPath))
 	// clone provided repository to local path
 	if repo.LocalPath == "" {
@@ -57,9 +59,10 @@ func NewLocalGitClient(log *zap.Logger, self Author, repo Repository) (*LocalGit
 	repo.localRepo = localRepo
 
 	return &LocalGitClient{
-		log:  log,
-		self: self,
-		repo: repo,
+		log:      log,
+		self:     self,
+		repo:     repo,
+		debugDir: debugDir,
 	}, nil
 }
 
@@ -239,6 +242,7 @@ func (gc *LocalGitClient) ParseIssueAndStartCommit(issue Issue) (llm.CodeChangeR
 	}
 
 	issueBody := ParseIssueBody(issue.Body)
+	gc.log.Info("issue body info", zap.Any("files", issueBody.FilePaths))
 
 	// start a worktree
 	err := gc.StartCommit()
@@ -264,11 +268,38 @@ func (gc *LocalGitClient) ParseIssueAndStartCommit(issue Issue) (llm.CodeChangeR
 		files = append(files, nextFile)
 	}
 
-	return llm.CodeChangeRequest{
+	req := llm.CodeChangeRequest{
 		Subject:     issue.Subject,
 		Body:        issueBody.PromptBody,
 		IssueNumber: issue.Number,
 		Files:       files,
 		BaseBranch:  issueBody.BaseBranch,
-	}, nil
+	}
+	debugFileNamePrefix := fmt.Sprintf("issue-%d-%d", issue.Number, time.Now().Unix())
+	gc.writeDebug("issues", debugFileNamePrefix+"-originalbody.txt", issue.Body)
+	gc.writeDebug("issues", debugFileNamePrefix+"-parsed-req.txt", req.String())
+
+	return req, nil
+}
+
+func (gc *LocalGitClient) writeDebug(subdir, filename, contents string) {
+	if gc.debugDir == "" {
+		return
+	}
+
+	fullFolderPath := path.Join(gc.debugDir, subdir)
+
+	err := os.MkdirAll(fullFolderPath, os.ModePerm)
+	if err != nil {
+		gc.log.Error("failed to ensure debug directory existed", zap.String("folderpath", fullFolderPath), zap.Error(err))
+		return
+	}
+
+	fullPath := path.Join(fullFolderPath, filename)
+	err = ioutil.WriteFile(fullPath, []byte(contents), 0644)
+	if err != nil {
+		gc.log.Error("failed to write response to debug file", zap.String("filepath", fullPath), zap.Error(err))
+		return
+	}
+	gc.log.Info("response written to debug file", zap.String("filepath", fullPath))
 }

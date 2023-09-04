@@ -2,8 +2,9 @@ package llm
 
 import (
 	"bytes"
-	"encoding/json"
 	"text/template"
+
+	"gopkg.in/yaml.v3"
 )
 
 func (req DiffCommentRequest) String() string {
@@ -57,6 +58,6 @@ func (res DiffCommentResponse) String() string {
 
 func ParseDiffCommentResponse(llmResponse string) (DiffCommentResponse, error) {
 	var response DiffCommentResponse
-	err := json.Unmarshal([]byte(llmResponse), &response)
+	err := yaml.Unmarshal([]byte(llmResponse), &response)
 	return response, err
 }

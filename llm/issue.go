@@ -2,8 +2,9 @@ package llm
 
 import (
 	"bytes"
-	"encoding/json"
 	"text/template"
+
+	"gopkg.in/yaml.v3"
 )
 
 // String is the string representation of a CodeChangeRequest. Functionally, it contains the LLM prompt.
@@ -52,6 +53,6 @@ func (res CodeChangeResponse) String() string {
 // ParseCodeChangeResponse parses the LLM's response to CodeChangeRequest (string) into a CodeChangeResponse.
 func ParseCodeChangeResponse(llmResponse string) (CodeChangeResponse, error) {
 	var response CodeChangeResponse
-	err := json.Unmarshal([]byte(llmResponse), &response)
+	err := yaml.Unmarshal([]byte(llmResponse), &response)
 	return response, err
 }
