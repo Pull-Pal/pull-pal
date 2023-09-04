@@ -26,6 +26,7 @@ type Config struct {
 	ListIssueOptions vc.ListIssueOptions
 	Model            string
 	OpenAIToken      string
+	DebugDir         string
 }
 
 // PullPal is the service responsible for:
@@ -54,11 +55,10 @@ type pullPalRepo struct {
 
 // NewPullPal creates a new "pull pal service", including setting up local version control and LLM integrations.
 func NewPullPal(ctx context.Context, log *zap.Logger, cfg Config) (*PullPal, error) {
-	openAIClient := llm.NewOpenAIClient(log.Named("openaiClient"), cfg.Model, cfg.OpenAIToken)
+	openAIClient := llm.NewOpenAIClient(log.Named("openaiClient"), cfg.Model, cfg.OpenAIToken, cfg.DebugDir)
 
 	ppRepos := []pullPalRepo{}
 	for _, r := range cfg.Repos {
-		fmt.Println(r)
 		parts := strings.Split(r, "/")
 		if len(parts) < 3 {
 			continue
@@ -66,9 +66,6 @@ func NewPullPal(ctx context.Context, log *zap.Logger, cfg Config) (*PullPal, err
 		host := parts[0]
 		owner := parts[1]
 		name := parts[2]
-		fmt.Println(host)
-		fmt.Println(owner)
-		fmt.Println(name)
 		newRepo := vc.Repository{
 			LocalPath:  filepath.Join(cfg.LocalRepoPath, owner, name),
 			HostDomain: host,
@@ -81,7 +78,7 @@ func NewPullPal(ctx context.Context, log *zap.Logger, cfg Config) (*PullPal, err
 		if err != nil {
 			return nil, err
 		}
-		localGitClient, err := vc.NewLocalGitClient(log.Named("gitclient-"+r), cfg.Self, newRepo)
+		localGitClient, err := vc.NewLocalGitClient(log.Named("gitclient-"+r), cfg.Self, newRepo, cfg.DebugDir)
 		if err != nil {
 			return nil, err
 		}
@@ -145,7 +142,6 @@ func (p pullPalRepo) checkIssuesAndComments() error {
 		issue := issues[0]
 		err = p.handleIssue(issue)
 		if err != nil {
-			// TODO leave comment if error (make configurable)
 			p.log.Error("error handling issue", zap.Error(err))
 			commentText := fmt.Sprintf("I ran into a problem working on this:\n```\n%s\n```", err.Error())
 			err = p.ghClient.CommentOnIssue(issue.Number, commentText)
@@ -173,7 +169,6 @@ func (p pullPalRepo) checkIssuesAndComments() error {
 		comment := comments[0]
 		err = p.handleComment(comment)
 		if err != nil {
-			// TODO leave comment if error (make configurable)
 			p.log.Error("error handling comment", zap.Error(err))
 			commentText := fmt.Sprintf("I ran into a problem working on this:\n```\n%s\n```", err.Error())
 			err = p.ghClient.RespondToComment(comment.PRNumber, comment.ID, commentText)
@@ -187,11 +182,7 @@ func (p pullPalRepo) checkIssuesAndComments() error {
 }
 
 func (p *pullPalRepo) handleIssue(issue vc.Issue) error {
-	err := p.ghClient.CommentOnIssue(issue.Number, "working on it")
-	if err != nil {
-		p.log.Error("error commenting on issue", zap.Error(err))
-		return err
-	}
+	// remove labels from issue so that it is not picked up again until labels are reapplied
 	for _, label := range p.listIssueOptions.Labels {
 		err = p.ghClient.RemoveLabelFromIssue(issue.Number, label)
 		if err != nil {
@@ -236,7 +227,6 @@ func (p *pullPalRepo) handleIssue(issue vc.Issue) error {
 	}
 
 	// open code change request
-	// TODO don't hardcode main branch, make configurable
 	_, url, err := p.ghClient.OpenCodeChangeRequest(changeRequest, changeResponse, newBranchName)
 	if err != nil {
 		return err
@@ -260,6 +250,7 @@ func (p *pullPalRepo) handleComment(comment vc.Comment) error {
 		File:     file,
 		Contents: comment.Body,
 		Diff:     comment.DiffHunk,
+		PRNumber: comment.PRNumber,
 	}
 	p.log.Info("diff comment request", zap.String("req", diffCommentRequest.String()))
 
@@ -298,7 +289,7 @@ func (p *pullPalRepo) handleComment(comment vc.Comment) error {
 		}
 	}
 
-	err = p.ghClient.RespondToComment(comment.PRNumber, comment.ID, diffCommentResponse.Answer)
+	err = p.ghClient.RespondToComment(comment.PRNumber, comment.ID, diffCommentResponse.Response)
 	if err != nil {
 		p.log.Error("error commenting on issue", zap.Error(err))
 		return err

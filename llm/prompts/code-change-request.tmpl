@@ -12,13 +12,13 @@ Subject: {{ .Subject }}
 Body:
 {{ .Body }}
 
-Respond in the exact format:
-Files:
+Respond in a parseable YAML format based on the following template. Respond only with YAML, and nothing else:
+files:
 {{ range $index, $file := .Files }}
-ppname: {{ $file.Path }}
-ppcontents:
-[new {{ $file.Path }} contents]
+  -
+    path: {{ $file.Path }}
+    contents: |
+      [new {{ $file.Path }} contents]
 {{ end }}
-
-ppnotes:
-[additional context about your changes]
+notes: |
+  [additional context about your changes]

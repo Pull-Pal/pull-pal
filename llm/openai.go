@@ -2,6 +2,11 @@ package llm
 
 import (
 	"context"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path"
+	"time"
 
 	"github.com/sashabaranov/go-openai"
 	"go.uber.org/zap"
@@ -10,14 +15,16 @@ import (
 type OpenAIClient struct {
 	log          *zap.Logger
 	client       *openai.Client
+	debugDir     string
 	defaultModel string
 }
 
-func NewOpenAIClient(log *zap.Logger, defaultModel, token string) *OpenAIClient {
+func NewOpenAIClient(log *zap.Logger, defaultModel, token, debugDir string) *OpenAIClient {
 	return &OpenAIClient{
 		log:          log,
 		client:       openai.NewClient(token),
 		defaultModel: defaultModel,
+		debugDir:     debugDir,
 	}
 }
 
@@ -44,10 +51,13 @@ func (oc *OpenAIClient) EvaluateCCR(ctx context.Context, model string, req CodeC
 
 	choice := resp.Choices[0].Message.Content
 
-	// TODO make debug log when I figure out how to config that
-	oc.log.Info("got response from llm", zap.String("output", choice))
+	oc.log.Info("got response from llm")
 
-	return ParseCodeChangeResponse(choice), nil
+	debugFilePrefix := fmt.Sprintf("%d-%d", req.IssueNumber, time.Now().Unix())
+	oc.writeDebug("codechangeresponse", debugFilePrefix+"-req.txt", req.String())
+	oc.writeDebug("codechangeresponse", debugFilePrefix+"-res.yaml", choice)
+
+	return ParseCodeChangeResponse(choice)
 }
 
 func (oc *OpenAIClient) EvaluateDiffComment(ctx context.Context, model string, req DiffCommentRequest) (res DiffCommentResponse, err error) {
@@ -73,8 +83,33 @@ func (oc *OpenAIClient) EvaluateDiffComment(ctx context.Context, model string, r
 
 	choice := resp.Choices[0].Message.Content
 
-	// TODO make debug log when I figure out how to config that
 	oc.log.Info("got response from llm", zap.String("output", choice))
 
-	return ParseDiffCommentResponse(choice), nil
+	debugFilePrefix := fmt.Sprintf("%d-%d", req.PRNumber, time.Now().Unix())
+	oc.writeDebug("diffcommentresponse", debugFilePrefix+"-req.txt", req.String())
+	oc.writeDebug("diffcommentresponse", debugFilePrefix+"-res.yaml", choice)
+
+	return ParseDiffCommentResponse(choice)
+}
+
+func (oc *OpenAIClient) writeDebug(subdir, filename, contents string) {
+	if oc.debugDir == "" {
+		return
+	}
+
+	fullFolderPath := path.Join(oc.debugDir, subdir)
+
+	err := os.MkdirAll(fullFolderPath, os.ModePerm)
+	if err != nil {
+		oc.log.Error("failed to ensure debug directory existed", zap.String("folderpath", fullFolderPath), zap.Error(err))
+		return
+	}
+
+	fullPath := path.Join(fullFolderPath, filename)
+	err = ioutil.WriteFile(fullPath, []byte(contents), 0644)
+	if err != nil {
+		oc.log.Error("failed to write response to debug file", zap.String("filepath", fullPath), zap.Error(err))
+		return
+	}
+	oc.log.Info("response written to debug file", zap.String("filepath", fullPath))
 }

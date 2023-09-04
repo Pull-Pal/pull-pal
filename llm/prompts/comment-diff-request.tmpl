@@ -16,19 +16,20 @@ Comment:
 The above is information about a comment left on a file. The diff contains information about the precise location of the comment.
 
 First, determine if the comment is a question or a request for changes.
-If the comment is a question, come up with an answer, and respond exactly as outlined directly below "Response Template A", starting with "Q".
-If the comment is a request, modify the file provided at the beginning of the message, and respond exactly as outlined directly below "Response Template B", starting with "R".
+If the comment is a question, come up with an answer, and respond exactly as outlined directly below "Response Template A".
+If the comment is a request, modify the file provided at the beginning of the message, and respond exactly as outlined directly below "Response Template B".
+For either response template, respond in a parseable YAML format. Respond only with YAML, and nothing else.
 
 Response Template A:
-Q
-[your answer]
+responseType: 0
+response: |
+  [your answer]
 
 Response Template B:
-R
-Files:
-ppname: {{ .File.Path }}
-ppcontents:
-[new {{ .File.Path }} contents]
-
-ppresponse:
-[additional context about your changes]
+responseType: 1
+file:
+  path: {{ .File.Path }}
+  contents: |
+    [new {{ .File.Path }} contents]
+response: |
+  [additional context about your changes]

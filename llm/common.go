@@ -1,13 +1,9 @@
 package llm
 
-import (
-	"strings"
-)
-
 // File represents a file in a git repository.
 type File struct {
-	Path     string
-	Contents string
+	Path     string `yaml:"path"`
+	Contents string `yaml:"contents"`
 }
 
 type ResponseType int
@@ -28,8 +24,8 @@ type CodeChangeRequest struct {
 
 // CodeChangeResponse contains data derived from an LLM response to a prompt generated via a CodeChangeRequest.
 type CodeChangeResponse struct {
-	Files []File
-	Notes string
+	Files []File `yaml:"files"`
+	Notes string `yaml:"notes"`
 }
 
 // TODO support threads
@@ -37,45 +33,11 @@ type DiffCommentRequest struct {
 	File     File
 	Contents string
 	Diff     string
+	PRNumber int
 }
 
 type DiffCommentResponse struct {
-	Type   ResponseType
-	Answer string
-	File   File
-}
-
-// parseFiles process the "files" subsection of the LLM's response. It is a helper for GetCodeChangeResponse.
-func parseFiles(filesSection string) []File {
-	fileStringList := strings.Split(filesSection, "ppname:")
-	if len(fileStringList) < 2 {
-		return []File{}
-	}
-	// first item in the list is just gonna be "Files:"
-	fileStringList = fileStringList[1:]
-
-	replacer := strings.NewReplacer(
-		"\\n", "\n",
-		"\\\"", "\"",
-		"```", "",
-	)
-	fileList := make([]File, len(fileStringList))
-	for i, f := range fileStringList {
-		fileParts := strings.Split(f, "ppcontents:")
-		if len(fileParts) < 2 {
-			continue
-		}
-		path := replacer.Replace(fileParts[0])
-		path = strings.TrimSpace(path)
-
-		contents := replacer.Replace(fileParts[1])
-		contents = strings.TrimSpace(contents)
-
-		fileList[i] = File{
-			Path:     path,
-			Contents: contents,
-		}
-	}
-
-	return fileList
+	Type     ResponseType `yaml:"responseType"`
+	Response string       `yaml:"response"`
+	File     File         `yaml:"file"`
 }
