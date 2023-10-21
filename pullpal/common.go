@@ -181,7 +181,7 @@ func (p pullPalRepo) checkIssuesAndComments() error {
 	return nil
 }
 
-func (p *pullPalRepo) handleIssue(issue vc.Issue) error {
+func (p *pullPalRepo) handleIssue(issue vc.Issue) (err error) {
 	// remove labels from issue so that it is not picked up again until labels are reapplied
 	for _, label := range p.listIssueOptions.Labels {
 		err = p.ghClient.RemoveLabelFromIssue(issue.Number, label)
